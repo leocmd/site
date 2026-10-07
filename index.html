@@ -1,18 +1,925 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>leowisnia.com</title>
-    
-    <!-- Link to external CSS stylesheet -->
-    <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Metrics</title>
+<style>
+  :root {
+    --bg: #0a1020;
+    --panel: #0f1930;
+    --line: #1d2b4b;
+    --k: #7b8fb5;
+    --v: #e9efff;
+    --accent: #5cc8ff;
+    --warn: #ffb86b;
+    --flash: rgba(92, 200, 255, .22);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--v); }
+  body {
+    font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    padding: 16px;
+  }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+  #hdr { color: var(--k); }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .panel.span2 { grid-column: span 2; }
+  .ph {
+    display: flex; justify-content: space-between; gap: 8px;
+    margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  .ph b { color: var(--accent); font-weight: 700; }
+  .ph i { color: var(--k); font-style: normal; font-size: 11px; text-align: right; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 1.5px 0; }
+  .k { color: var(--k); flex: 0 1 auto; }
+  .v {
+    text-align: right; font-variant-numeric: tabular-nums; word-break: break-word;
+    border-radius: 3px; padding: 0 3px; margin: 0 -3px;
+  }
+  .v.f { animation: fl 1.2s ease-out; }
+  @keyframes fl { from { background: var(--flash); } to { background: transparent; } }
+  canvas { width: 100%; height: auto; display: block; border-radius: 4px; }
+  footer { margin-top: 16px; color: var(--k); font-size: 11px; max-width: 900px; }
+  @media (max-width: 700px) { .panel.span2 { grid-column: span 1; } body { padding: 10px; } }
+  @media (prefers-reduced-motion: reduce) { .v.f { animation: none; } }
+</style>
 </head>
 <body>
 
-    <!-- Your visible content goes here -->
+<header>
+  <h1>Live Metrics</h1>
+  <div id="hdr">starting…</div>
+</header>
 
-    <!-- Link to external JavaScript file (loaded at the end for optimal speed) -->
-    <script src="script.js"></script>
+<div id="grid"></div>
+
+<footer>
+  Feeds: wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
+  OpenSky, ipapi / ipwho.is, ISS crew list on GitHub Pages. Anything marked "est." or "≈" is computed or
+  modelled in your browser (sun, moon, sidereal time, population, Voyager 1, CO₂ fallback). If a feed
+  is blocked or rate-limited, its panel says offline and retries on its own.
+</footer>
+
+<script>
+(function () {
+'use strict';
+
+/* ---------- constants & helpers ---------- */
+var RAD = Math.PI / 180, DEG = 180 / Math.PI;
+var T0 = Date.now();
+var S = { loc: null, iss: null, track: [], reqs: 0, fail: 0, lat: null, ok: new Set(), bad: new Set(),
+          co2: null, lastq: null, fps: 0, mx: null, my: null, vorb: 29.78 };
+
+var pad = function (n, w) { return String(Math.trunc(n)).padStart(w || 2, '0'); };
+var nf = function (n, d) {
+  d = d || 0;
+  return Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+};
+var mod = function (a, n) { return ((a % n) + n) % n; };
+var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+var hms = function (d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); };
+var hrs = function (h) {
+  h = mod(h, 24);
+  var H = Math.floor(h), M = Math.floor((h - H) * 60), Sx = Math.floor(((h - H) * 60 - M) * 60);
+  return pad(H) + ':' + pad(M) + ':' + pad(Sx);
+};
+function dur(ms) {
+  var neg = ms < 0; ms = Math.abs(ms);
+  var s = Math.floor(ms / 1000);
+  var y = Math.floor(s / 31556952); s -= y * 31556952;
+  var d = Math.floor(s / 86400); s -= d * 86400;
+  var h = Math.floor(s / 3600); s -= h * 3600;
+  var m = Math.floor(s / 60); s -= m * 60;
+  return (neg ? '-' : '') + (y ? y + 'y ' : '') + (d || y ? d + 'd ' : '') + pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+var DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+var compass = function (deg) { return DIRS[Math.round(mod(deg, 360) / 22.5) % 16]; };
+var fl = function (v, p, n, s) { return nf(Math.abs(v), p) + '° ' + (v >= 0 ? n : s); };
+var C2F = function (c) { return c * 9 / 5 + 32; };
+function hav(la1, lo1, la2, lo2) {
+  var dLa = (la2 - la1) * RAD, dLo = (lo2 - lo1) * RAD;
+  var a = Math.sin(dLa / 2) * Math.sin(dLa / 2) +
+          Math.cos(la1 * RAD) * Math.cos(la2 * RAD) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* ---------- schema: every metric on the page ---------- */
+var SCHEMA = [
+{ id: 'time', title: 'Time', rows: [
+  ['t_local','Local time'],['t_date','Local date'],['t_tz','Time zone'],['t_utc','UTC time'],
+  ['t_iso','ISO 8601'],['t_unix','Unix time (s)'],['t_unixms','Unix time (ms)'],['t_jd','Julian date'],
+  ['t_mjd','Modified Julian date'],['t_doy','Day of year'],['t_week','ISO week'],['t_q','Quarter'],
+  ['t_day','Day elapsed'],['t_weekp','Week elapsed'],['t_mon','Month elapsed'],['t_yr','Year elapsed'],
+  ['t_dec','Decade elapsed'],['t_cen','Century elapsed'],['t_left','Left in year'],
+  ['t_beats','Swatch .beats'],['t_dtime','Decimal time (10h/100m/100s)'],['t_hex','Hex time (1/65536 day)'],
+  ['t_maya','Mayan Long Count'],['t_ny','Until New Year'],['t_moon','Since Moon landing'],['t_y2k','Since Y2K']
+]},
+{ id: 'earth', title: 'Earth & Sun', rows: [
+  ['e_au','Earth–Sun distance'],['e_km','Earth–Sun distance (km)'],['e_light','Sunlight travel time'],
+  ['e_vorb','Orbital speed'],['e_vrot','Rotation speed at you'],['e_odo','Orbited since page opened'],
+  ['e_gal','Galactic travel since opened'],['e_dec','Solar declination'],['e_eot','Equation of time'],
+  ['e_sub','Sub-solar point'],['e_alt','Sun altitude'],['e_az','Sun azimuth'],['e_phase','Sun phase'],
+  ['e_irr','Clear-sky sunlight (est.)'],['e_season','Season'],['e_next','Next solstice / equinox'],
+  ['e_nextin','Time until then'],['e_gmst','Greenwich sidereal time'],['e_lst','Local sidereal time']
+]},
+{ id: 'moon', title: 'Moon', rows: [
+  ['m_phase','Phase'],['m_illum','Illuminated'],['m_age','Age'],['m_cycle','Cycle progress'],
+  ['m_dist','Distance (≈)'],['m_full','Next full moon (≈)'],['m_new','Next new moon (≈)']
+]},
+{ id: 'iss', title: 'International Space Station', rows: [
+  ['i_lat','Latitude'],['i_lon','Longitude'],['i_alt','Altitude'],['i_vel','Speed'],['i_kms','Speed (km/s)'],
+  ['i_vis','Visibility'],['i_foot','Footprint'],['i_dist','Distance from you'],['i_elev','Elevation from you'],
+  ['i_per','Orbital period']
+]},
+{ id: 'map', title: 'ISS ground track', wide: true, map: true, rows: [] },
+{ id: 'loc', title: 'Your location', rows: [
+  ['l_src','Source'],['l_lat','Latitude'],['l_lon','Longitude'],['l_acc','Accuracy'],['l_alt','Device altitude'],
+  ['l_elev','Ground elevation'],['l_speed','Speed'],['l_head','Heading'],['l_place','Place (IP-based)'],
+  ['l_ip','IP address'],['l_isp','Network provider'],['l_tz','Time zone (IP-based)']
+]},
+{ id: 'wx', title: 'Weather at your location', rows: [
+  ['w_cond','Conditions'],['w_temp','Temperature'],['w_feels','Feels like'],['w_dew','Dew point'],
+  ['w_hum','Humidity'],['w_pres','Pressure (sea level)'],['w_pressfc','Pressure (surface)'],['w_wind','Wind speed'],
+  ['w_dir','Wind direction'],['w_gust','Wind gusts'],['w_cloud','Cloud cover'],['w_precip','Precipitation'],
+  ['w_vis','Visibility'],['w_uv','UV index now'],['w_uvmax','UV index max today'],['w_hi','High today'],
+  ['w_lo','Low today'],['w_rise','Sunrise'],['w_set','Sunset'],['w_daylen','Daylight today'],['w_sun','Sunshine today']
+]},
+{ id: 'aq', title: 'Air quality', rows: [
+  ['a_us','US AQI'],['a_eu','European AQI'],['a_pm25','PM2.5'],['a_pm10','PM10'],['a_co','Carbon monoxide'],
+  ['a_no2','Nitrogen dioxide'],['a_so2','Sulphur dioxide'],['a_o3','Ozone'],['a_dust','Dust'],['a_aod','Aerosol optical depth']
+]},
+{ id: 'climate', title: 'Atmosphere & climate', rows: [
+  ['c_co2','CO₂ at Mauna Loa'],['c_src','CO₂ source'],['c_x','Above pre-industrial (280 ppm)'],
+  ['c_emit','CO₂ emitted worldwide since page opened (est.)'],['c_sol','Sunlight intercepted by Earth']
+]},
+{ id: 'sw', title: 'Space weather (NOAA SWPC)', rows: [
+  ['s_kp','Planetary Kp index'],['s_g','Geomagnetic storm level'],['s_speed','Solar wind speed'],
+  ['s_dens','Solar wind density'],['s_temp','Solar wind temperature'],['s_bz','Magnetic field Bz'],
+  ['s_bt','Magnetic field total (Bt)'],['s_flux','Solar radio flux (10.7 cm)'],['s_xray','Solar X-ray flux'],
+  ['s_flare','Flare class right now']
+]},
+{ id: 'eq', title: 'Earthquakes (USGS, last 24 h)', rows: [
+  ['q_hour','Past hour'],['q_day','Past 24 hours'],['q_m45','M4.5 and above (24 h)'],['q_max','Strongest (24 h)'],
+  ['q_maxplace','Strongest location'],['q_avg','Average magnitude'],['q_last','Latest quake'],
+  ['q_ago','Latest quake was'],['q_closest','Closest to you (24 h)'],['q_sig','Significant (7 days)']
+]},
+{ id: 'mk', title: 'Markets & networks', rows: [
+  ['b_btc','Bitcoin'],['b_eth','Ethereum'],['b_sol','Solana'],['b_doge','Dogecoin'],['b_height','Bitcoin block height'],
+  ['b_halv','Blocks to next halving'],['b_diff','Next difficulty change'],['b_fee','Bitcoin fastest fee'],
+  ['f_eur','1 USD in EUR'],['f_gbp','1 USD in GBP'],['f_jpy','1 USD in JPY'],['f_cad','1 USD in CAD'],
+  ['f_aud','1 USD in AUD'],['f_cny','1 USD in CNY'],['f_date','FX rates as of']
+]},
+{ id: 'hum', title: 'Humanity & beyond', rows: [
+  ['h_pop','World population (est.)'],['h_births','Births today, UTC (est.)'],['h_deaths','Deaths today, UTC (est.)'],
+  ['h_space','People in space now'],['h_craft','By spacecraft'],['h_v1','Voyager 1 distance (est.)'],
+  ['h_v1km','Voyager 1 distance (km)'],['h_v1lt','Voyager 1 light-time'],['h_v1v','Voyager 1 speed']
+]},
+{ id: 'air', title: 'Airspace near you (±1°)', rows: [
+  ['p_total','Aircraft tracked'],['p_air','Airborne'],['p_gnd','On ground'],['p_hi','Highest altitude'],
+  ['p_fast','Fastest'],['p_origin','Most common origin country']
+]},
+{ id: 'dev', title: 'Your device & browser', rows: [
+  ['d_bat','Battery'],['d_chg','Power'],['d_net','Network type'],['d_down','Downlink'],['d_rtt','Round-trip time'],
+  ['d_save','Data saver'],['d_online','Connection'],['d_scr','Screen'],['d_view','Window'],['d_dpr','Pixel ratio'],
+  ['d_depth','Colour depth'],['d_orient','Orientation'],['d_cpu','CPU threads'],['d_mem','Device memory'],
+  ['d_touch','Touch points'],['d_plat','Platform'],['d_browser','Browser'],['d_lang','Languages'],
+  ['d_heap','JS heap in use'],['d_fps','Frame rate'],['d_mouse','Pointer position'],['d_scroll','Scroll position'],
+  ['d_vis','Tab visibility'],['d_ls','Local storage used'],['d_load','Page load time'],['d_up','Time on page'],
+  ['d_dom','DOM elements'],['d_reqs','Network requests made'],['d_fail','Failed requests'],['d_lat','Last API latency'],
+  ['d_color','Preferred colour scheme'],['d_motion','Reduced motion'],['d_ptr','Primary pointer'],
+  ['d_tilt','Tilt α / β / γ'],['d_accel','Acceleration x / y / z'],['d_cookie','Cookies']
+]}
+];
+
+/* ---------- build the DOM ---------- */
+var VAL = {}, PANEL = {}, METRICS = 0;
+(function build() {
+  var grid = document.getElementById('grid');
+  SCHEMA.forEach(function (p) {
+    var s = document.createElement('section');
+    s.className = 'panel' + (p.wide ? ' span2' : '');
+    var h = document.createElement('div'); h.className = 'ph';
+    var b = document.createElement('b'); b.textContent = p.title;
+    var i = document.createElement('i'); i.textContent = '';
+    h.appendChild(b); h.appendChild(i); s.appendChild(h);
+    PANEL[p.id] = i;
+    if (p.map) { var c = document.createElement('canvas'); c.id = 'map'; c.width = 720; c.height = 360; s.appendChild(c); }
+    p.rows.forEach(function (r) {
+      var row = document.createElement('div'); row.className = 'row';
+      var k = document.createElement('span'); k.className = 'k'; k.textContent = r[1];
+      var v = document.createElement('span'); v.className = 'v'; v.textContent = '…';
+      row.appendChild(k); row.appendChild(v); s.appendChild(row);
+      VAL[r[0]] = v; METRICS++;
+    });
+    grid.appendChild(s);
+  });
+})();
+
+function set(k, v, flash) {
+  var e = VAL[k]; if (!e) return;
+  v = String(v);
+  if (e.textContent === v) return;
+  e.textContent = v;
+  if (flash) { e.classList.remove('f'); void e.offsetWidth; e.classList.add('f'); }
+}
+var live = function (k, v) { set(k, v, true); };
+function stamp(id, ok) {
+  var e = PANEL[id]; if (!e) return;
+  e.textContent = ok ? 'updated ' + hms(new Date()) : 'offline · retrying';
+  e.style.color = ok ? '' : 'var(--warn)';
+}
+function hdr() {
+  var el = document.getElementById('hdr');
+  el.textContent = METRICS + ' metrics · ' + S.ok.size + '/' + JOBS.length + ' feeds live · ' +
+                   S.reqs + ' requests (' + S.fail + ' failed)';
+}
+['time','earth','moon'].forEach(function (id) { PANEL[id].textContent = 'computed locally'; });
+PANEL.dev.textContent = 'this browser';
+PANEL.hum.textContent = 'estimates + feeds';
+
+/* ---------- networking & job scheduler ---------- */
+async function fx(url, text) {
+  S.reqs++;
+  var t0 = performance.now();
+  try {
+    var r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var out = text ? await r.text() : await r.json();
+    S.lat = performance.now() - t0;
+    return out;
+  } catch (e) { S.fail++; throw e; }
+}
+var JOBS = [];
+function job(name, panel, every, fn, needsLoc) {
+  JOBS.push({ name: name, panel: panel, every: every, fn: fn, needsLoc: !!needsLoc, last: 0, busy: false });
+}
+async function runJob(j) {
+  if (j.busy || (j.needsLoc && !S.loc)) return;
+  j.busy = true; j.last = Date.now();
+  try {
+    await j.fn();
+    S.ok.add(j.name); S.bad.delete(j.name); stamp(j.panel, true);
+  } catch (e) {
+    S.bad.add(j.name); S.ok.delete(j.name);
+    j.last = Date.now() - j.every + Math.min(j.every, 30000);
+    stamp(j.panel, false);
+  } finally { j.busy = false; hdr(); }
+}
+function schedule() {
+  if (document.hidden) return;
+  var n = Date.now();
+  JOBS.forEach(function (j) { if (n - j.last >= j.every) runJob(j); });
+}
+
+/* ---------- astronomy (all computed locally) ---------- */
+function sunCalc(ms) {
+  var jd = ms / 86400000 + 2440587.5, d = jd - 2451545.0;
+  var L = mod(280.460 + 0.9856474 * d, 360), g = mod(357.528 + 0.9856003 * d, 360);
+  var lam = L + 1.915 * Math.sin(g * RAD) + 0.020 * Math.sin(2 * g * RAD);
+  var eps = 23.439 - 0.0000004 * d;
+  var ra = mod(Math.atan2(Math.cos(eps * RAD) * Math.sin(lam * RAD), Math.cos(lam * RAD)) * DEG, 360);
+  var dec = Math.asin(Math.sin(eps * RAD) * Math.sin(lam * RAD)) * DEG;
+  var R = 1.00014 - 0.01671 * Math.cos(g * RAD) - 0.00014 * Math.cos(2 * g * RAD);
+  var gmst = mod(280.46061837 + 360.98564736629 * d, 360);
+  var eot = (mod(L - ra + 180, 360) - 180) * 4;
+  return { jd: jd, d: d, ra: ra, dec: dec, R: R, gmst: gmst, eot: eot };
+}
+function altaz(sc, lat, lon) {
+  var H = mod(sc.gmst + lon - sc.ra, 360) * RAD, la = lat * RAD, de = sc.dec * RAD;
+  var sa = Math.sin(la) * Math.sin(de) + Math.cos(la) * Math.cos(de) * Math.cos(H);
+  var alt = Math.asin(Math.max(-1, Math.min(1, sa))) * DEG;
+  var az = mod(Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(la) - Math.tan(de) * Math.cos(la)) * DEG + 180, 360);
+  return { alt: alt, az: az };
+}
+var SEAS = {
+  2025: [[20,9,1],[21,2,42],[22,18,19],[21,15,3]],
+  2026: [[20,14,46],[21,8,24],[23,0,5],[21,20,50]],
+  2027: [[20,20,25],[21,14,11],[23,6,2],[22,2,43]],
+  2028: [[20,2,17],[20,20,2],[22,11,45],[21,8,20]]
+};
+var SN = ['March equinox','June solstice','September equinox','December solstice'];
+function seasonEvents(y) {
+  var a = SEAS[y] || [[20,12,0],[21,12,0],[22,12,0],[21,12,0]];
+  return a.map(function (e, i) { return { n: SN[i], t: Date.UTC(y, [2,5,8,11][i], e[0], e[1], e[2]) }; });
+}
+function isoWeek(d) {
+  var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  var y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return [Math.ceil(((t - y0) / 86400000 + 1) / 7), t.getUTCFullYear()];
+}
+var SYN = 29.530588853;
+var MOONS = ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
+function moonPhaseName(f) {
+  if (f < 0.0339 || f >= 0.9661) return 'New Moon';
+  if (f < 0.2161) return 'Waxing Crescent';
+  if (f < 0.2839) return 'First Quarter';
+  if (f < 0.4661) return 'Waxing Gibbous';
+  if (f < 0.5339) return 'Full Moon';
+  if (f < 0.7161) return 'Waning Gibbous';
+  if (f < 0.7839) return 'Last Quarter';
+  return 'Waning Crescent';
+}
+var shortDT = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+
+/* ---------- fast tick (10 Hz) ---------- */
+var prog = function (a, b, ms) { return (ms - a) / (b - a) * 100; };
+function fast() {
+  var now = new Date(), ms = +now, y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  var off = -now.getTimezoneOffset(), ao = Math.abs(off);
+  set('t_local', hms(now) + '.' + pad(now.getMilliseconds(), 3));
+  set('t_tz', Intl.DateTimeFormat().resolvedOptions().timeZone + ' (UTC' + (off < 0 ? '−' : '+') + pad(ao / 60) + ':' + pad(ao % 60) + ')');
+  set('t_utc', pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + '.' + pad(now.getUTCMilliseconds(), 3));
+  set('t_iso', now.toISOString());
+  set('t_unix', nf(Math.floor(ms / 1000)));
+  set('t_unixms', nf(ms));
+  var jd = ms / 86400000 + 2440587.5;
+  set('t_jd', nf(jd, 6)); set('t_mjd', nf(jd - 2400000.5, 6));
+  var ds = new Date(y, mo, d), de = new Date(y, mo, d + 1);
+  var f = (ms - ds) / (de - ds);
+  set('t_day', nf(f * 100, 5) + ' %');
+  var dow = (now.getDay() + 6) % 7;
+  set('t_weekp', nf(prog(new Date(y, mo, d - dow), new Date(y, mo, d - dow + 7), ms), 4) + ' %');
+  set('t_mon', nf(prog(new Date(y, mo, 1), new Date(y, mo + 1, 1), ms), 4) + ' %');
+  var yS = new Date(y, 0, 1), yE = new Date(y + 1, 0, 1);
+  set('t_yr', nf(prog(yS, yE, ms), 6) + ' %');
+  var dc = Math.floor(y / 10) * 10;
+  set('t_dec', nf(prog(new Date(dc, 0, 1), new Date(dc + 10, 0, 1), ms), 7) + ' %');
+  var cn = Math.floor(y / 100) * 100;
+  set('t_cen', nf(prog(new Date(cn, 0, 1), new Date(cn + 100, 0, 1), ms), 8) + ' %');
+  set('t_left', nf((yE - ms) / 86400000, 4) + ' days');
+  set('t_beats', '@' + nf(mod(ms / 1000 + 3600, 86400) / 86.4, 3));
+  var dh = f * 10, hh = Math.floor(dh), mm = Math.floor((dh - hh) * 100), ss = Math.floor(((dh - hh) * 100 - mm) * 100);
+  set('t_dtime', hh + ':' + pad(mm) + ':' + pad(ss));
+  set('t_hex', '0x' + Math.floor(f * 65536).toString(16).toUpperCase().padStart(4, '0'));
+  set('t_ny', dur(yE - ms));
+  set('t_moon', dur(ms - Date.UTC(1969, 6, 20, 20, 17, 40)));
+  set('t_y2k', dur(ms - Date.UTC(2000, 0, 1)));
+
+  var up = (ms - T0) / 1000;
+  set('e_odo', nf(up * S.vorb, 1) + ' km');
+  set('e_gal', nf(up * 230, 0) + ' km');
+  set('c_emit', nf(up * 1185, 0) + ' tonnes');
+
+  var pop = 8.23e9 + (ms - Date.UTC(2025, 6, 1)) / 1000 * 2.218;
+  set('h_pop', nf(pop, 0));
+  var sod = (ms - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 1000;
+  set('h_births', nf(sod * 4.20, 0));
+  set('h_deaths', nf(sod * 1.97, 0));
+  var au = 173.14 + 3.57 * ((ms - Date.UTC(2026, 10, 15)) / 31557600000);
+  set('h_v1', nf(au, 5) + ' AU');
+  set('h_v1km', nf(au * 149597870.7, 0) + ' km');
+  var lt = au * 499.004784;
+  set('h_v1lt', Math.floor(lt / 3600) + ' h ' + pad((lt % 3600) / 60) + ' m ' + pad(lt % 60) + ' s');
+  set('h_v1v', '≈ 16.9 km/s');
+
+  set('d_up', dur(ms - T0));
+  if (S.mx != null) set('d_mouse', S.mx + ', ' + S.my);
+}
+
+/* ---------- slow tick (1 Hz) ---------- */
+function slow() {
+  var now = new Date(), ms = +now, y = now.getFullYear();
+  set('t_date', now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+  var doy = Math.round((Date.UTC(y, now.getMonth(), now.getDate()) - Date.UTC(y, 0, 0)) / 86400000);
+  set('t_doy', doy + ' of ' + (((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365));
+  var wk = isoWeek(now); set('t_week', 'W' + pad(wk[0]) + ' of ' + wk[1]);
+  set('t_q', 'Q' + (Math.floor(now.getMonth() / 3) + 1));
+  var jdn = Math.floor(ms / 86400000 + 2440587.5 + 0.5), dd = jdn - 584283;
+  var bk = Math.floor(dd / 144000), r = dd % 144000;
+  var ka = Math.floor(r / 7200); r %= 7200;
+  var tu = Math.floor(r / 360); r %= 360;
+  set('t_maya', bk + '.' + ka + '.' + tu + '.' + Math.floor(r / 20) + '.' + (r % 20));
+
+  /* sun & earth */
+  var sc = sunCalc(ms), loc = S.loc;
+  var rkm = sc.R * 149597870.7;
+  set('e_au', nf(sc.R, 6) + ' AU');
+  set('e_km', nf(rkm, 0) + ' km');
+  var lsec = rkm / 299792.458;
+  set('e_light', Math.floor(lsec / 60) + ' min ' + nf(lsec % 60, 1) + ' s');
+  S.vorb = Math.sqrt(1.32712440018e11 * (2 / rkm - 1 / 149597870.7));
+  set('e_vorb', nf(S.vorb, 3) + ' km/s (' + nf(S.vorb * 3600, 0) + ' km/h)');
+  set('e_vrot', nf(465.1 * Math.cos((loc ? loc.lat : 0) * RAD), 1) + ' m/s' + (loc ? '' : ' (equator)'));
+  set('e_dec', nf(sc.dec, 3) + '°');
+  set('e_eot', (sc.eot >= 0 ? '+' : '−') + nf(Math.abs(sc.eot), 2) + ' min');
+  set('e_sub', fl(sc.dec, 2, 'N', 'S') + ', ' + fl(mod(sc.ra - sc.gmst + 180, 360) - 180, 2, 'E', 'W'));
+  set('e_gmst', hrs(sc.gmst / 15));
+  set('c_sol', nf(1361 / (sc.R * sc.R) * Math.PI * Math.pow(6.371e6, 2) / 1e15, 2) + ' PW');
+  if (loc) {
+    var aa = altaz(sc, loc.lat, loc.lon);
+    set('e_alt', nf(aa.alt, 2) + '°');
+    set('e_az', nf(aa.az, 1) + '° ' + compass(aa.az));
+    set('e_phase', aa.alt > 0 ? 'Daytime' : aa.alt > -6 ? 'Civil twilight' : aa.alt > -12 ? 'Nautical twilight' : aa.alt > -18 ? 'Astronomical twilight' : 'Night');
+    var irr = 0;
+    if (aa.alt > 0) {
+      var sa = Math.sin(aa.alt * RAD), am = Math.min(38, 1 / sa);
+      irr = 1361 / (sc.R * sc.R) * Math.pow(0.7, Math.pow(am, 0.678)) * sa;
+    }
+    set('e_irr', '≈ ' + nf(irr, 0) + ' W/m²');
+    set('e_lst', hrs(mod(sc.gmst + loc.lon, 360) / 15));
+  } else {
+    ['e_alt','e_az','e_phase','e_irr','e_lst'].forEach(function (k) { set(k, 'Waiting for location'); });
+  }
+  var evs = seasonEvents(y - 1).concat(seasonEvents(y), seasonEvents(y + 1)).sort(function (a, b) { return a.t - b.t; });
+  var idx = -1; evs.forEach(function (e, i) { if (e.t <= ms) idx = i; });
+  var cur = evs[idx], nxt = evs[idx + 1];
+  var south = loc && loc.lat < 0;
+  var names = south ? ['Autumn','Winter','Spring','Summer'] : ['Spring','Summer','Autumn','Winter'];
+  set('e_season', names[SN.indexOf(cur.n)] + ' · day ' + (Math.floor((ms - cur.t) / 86400000) + 1));
+  set('e_next', nxt.n + ' · ' + new Date(nxt.t).toLocaleString(undefined, shortDT));
+  set('e_nextin', dur(nxt.t - ms));
+
+  /* moon */
+  var age = mod(sc.jd - 2451550.1, SYN), mf = age / SYN;
+  var M = (134.963 + 13.064993 * sc.d) * RAD, D = (297.850 + 12.190749 * sc.d) * RAD;
+  var mdist = 385001 - 20905 * Math.cos(M) - 3699 * Math.cos(2 * D - M) - 2956 * Math.cos(2 * D);
+  set('m_phase', MOONS[Math.round(mf * 8) % 8] + ' ' + moonPhaseName(mf));
+  set('m_illum', nf((1 - Math.cos(2 * Math.PI * mf)) / 2 * 100, 1) + ' %');
+  set('m_age', nf(age, 2) + ' days');
+  set('m_cycle', nf(mf * 100, 1) + ' %');
+  set('m_dist', '≈ ' + nf(mdist, 0) + ' km');
+  var toFull = mod(SYN / 2 - age, SYN) * 86400000, toNew = (SYN - age) * 86400000;
+  set('m_full', new Date(ms + toFull).toLocaleString(undefined, shortDT) + ' (in ' + dur(toFull) + ')');
+  set('m_new', new Date(ms + toNew).toLocaleString(undefined, shortDT) + ' (in ' + dur(toNew) + ')');
+
+  /* climate (estimate unless NOAA feed worked) */
+  var co2, src;
+  if (S.co2) { co2 = S.co2.v; src = S.co2.label; }
+  else {
+    var dec = y + (ms - new Date(y, 0, 1)) / (new Date(y + 1, 0, 1) - new Date(y, 0, 1));
+    co2 = 424.6 + 2.6 * (dec - 2024.5) + 2.9 * Math.cos(2 * Math.PI * (dec - Math.floor(dec) - 0.38));
+    src = 'Model estimate (≈ ±1.5 ppm)';
+  }
+  set('c_co2', nf(co2, 2) + ' ppm');
+  set('c_src', src);
+  set('c_x', '+' + nf(co2 - 280, 1) + ' ppm (+' + nf((co2 / 280 - 1) * 100, 1) + ' %)');
+
+  /* quake age */
+  if (S.lastq) set('q_ago', dur(ms - S.lastq));
+
+  /* device */
+  var n = navigator, cn2 = n.connection || n.mozConnection || n.webkitConnection;
+  set('d_online', n.onLine ? 'Online' : 'Offline');
+  if (cn2) {
+    set('d_net', (cn2.effectiveType || '?') + (cn2.type ? ' / ' + cn2.type : ''));
+    set('d_down', cn2.downlink != null ? cn2.downlink + ' Mbps' : '—');
+    set('d_rtt', cn2.rtt != null ? cn2.rtt + ' ms' : '—');
+    set('d_save', cn2.saveData ? 'On' : 'Off');
+  } else { ['d_net','d_down','d_rtt','d_save'].forEach(function (k) { set(k, 'Not supported by this browser'); }); }
+  set('d_scr', screen.width + ' × ' + screen.height);
+  set('d_view', innerWidth + ' × ' + innerHeight);
+  set('d_dpr', nf(window.devicePixelRatio, 2));
+  set('d_depth', screen.colorDepth + '-bit');
+  set('d_orient', (screen.orientation && screen.orientation.type) || '—');
+  set('d_cpu', n.hardwareConcurrency ? n.hardwareConcurrency + ' threads' : '—');
+  set('d_mem', n.deviceMemory ? '≈ ' + n.deviceMemory + ' GB' : 'Not reported');
+  set('d_touch', n.maxTouchPoints != null ? n.maxTouchPoints : '—');
+  set('d_plat', (n.userAgentData && n.userAgentData.platform) || n.platform || '—');
+  set('d_browser', browser());
+  set('d_lang', (n.languages && n.languages.length ? n.languages.join(', ') : n.language) || '—');
+  set('d_heap', performance.memory ? nf(performance.memory.usedJSHeapSize / 1048576, 1) + ' MB' : 'Not reported');
+  set('d_fps', nf(S.fps, 0) + ' fps');
+  var sh = document.documentElement.scrollHeight - innerHeight;
+  set('d_scroll', nf(sh > 0 ? scrollY / sh * 100 : 0, 1) + ' %');
+  set('d_vis', document.visibilityState);
+  try {
+    var b = 0;
+    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); b += (k.length + localStorage.getItem(k).length) * 2; }
+    set('d_ls', nf(b / 1024, 2) + ' KB (' + localStorage.length + ' keys)');
+  } catch (e) { set('d_ls', 'Unavailable'); }
+  var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+  if (nav && nav.loadEventEnd > 0) set('d_load', nf(nav.loadEventEnd, 0) + ' ms');
+  set('d_dom', nf(document.getElementsByTagName('*').length));
+  set('d_reqs', nf(S.reqs));
+  set('d_fail', nf(S.fail));
+  set('d_lat', S.lat == null ? '—' : nf(S.lat, 0) + ' ms');
+  set('d_color', matchMedia('(prefers-color-scheme: dark)').matches ? 'Dark' : 'Light');
+  set('d_motion', matchMedia('(prefers-reduced-motion: reduce)').matches ? 'Reduce' : 'No preference');
+  set('d_ptr', matchMedia('(pointer: coarse)').matches ? 'Touch (coarse)' : 'Mouse / trackpad (fine)');
+  set('d_cookie', n.cookieEnabled ? 'Enabled' : 'Disabled');
+}
+function browser() {
+  var n = navigator, b = n.userAgentData && n.userAgentData.brands;
+  if (b) {
+    var x = b.filter(function (o) { return !/not.?a.?brand/i.test(o.brand); });
+    var p = x.find(function (o) { return !/chromium/i.test(o.brand); }) || x[0];
+    if (p) return p.brand + ' ' + p.version;
+  }
+  var m = n.userAgent.match(/(Firefox|Edg|Chrome|Safari)\/([\d.]+)/);
+  return m ? m[1] + ' ' + m[2] : 'Unknown';
+}
+
+/* device listeners */
+set('d_tilt', 'No sensor data'); set('d_accel', 'No sensor data'); set('d_mouse', 'No pointer movement yet');
+set('i_per', '≈ 93 min (about 15.5 orbits a day)');
+addEventListener('pointermove', function (e) { S.mx = Math.round(e.clientX); S.my = Math.round(e.clientY); });
+addEventListener('deviceorientation', function (e) {
+  if (e.alpha == null && e.beta == null && e.gamma == null) return;
+  set('d_tilt', [e.alpha, e.beta, e.gamma].map(function (x) { return x == null ? '—' : nf(x, 0) + '°'; }).join(' / '));
+});
+addEventListener('devicemotion', function (e) {
+  var a = e.accelerationIncludingGravity;
+  if (a && a.x != null) set('d_accel', [a.x, a.y, a.z].map(function (v) { return nf(v, 2); }).join(' / ') + ' m/s²');
+});
+if (navigator.getBattery) {
+  navigator.getBattery().then(function (b) {
+    var u = function () {
+      set('d_bat', nf(b.level * 100, 0) + ' %');
+      set('d_chg', b.charging
+        ? 'Charging' + (isFinite(b.chargingTime) ? ' · full in ' + dur(b.chargingTime * 1000) : '')
+        : 'On battery' + (isFinite(b.dischargingTime) ? ' · ' + dur(b.dischargingTime * 1000) + ' left' : ''));
+    };
+    u();
+    ['levelchange','chargingchange','chargingtimechange','dischargingtimechange'].forEach(function (ev) { b.addEventListener(ev, u); });
+  }).catch(function () { set('d_bat', 'Unavailable'); set('d_chg', 'Unavailable'); });
+} else { set('d_bat', 'Not supported by this browser'); set('d_chg', 'Not supported by this browser'); }
+(function raf() {
+  var fr = 0, last = performance.now();
+  function loop(t) { fr++; if (t - last >= 1000) { S.fps = fr * 1000 / (t - last); fr = 0; last = t; } requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
+
+/* ---------- location ---------- */
+function setLoc(lat, lon, src, extra) {
+  S.loc = Object.assign({}, S.loc && S.loc.src === src ? S.loc : {}, { lat: lat, lon: lon, src: src }, extra || {});
+  set('l_src', src);
+  set('l_lat', fl(lat, 5, 'N', 'S'));
+  set('l_lon', fl(lon, 5, 'E', 'W'));
+  var L = S.loc;
+  set('l_acc', L.acc != null ? '± ' + nf(L.acc, 0) + ' m' : 'City-level (≈ 5–50 km)');
+  set('l_alt', L.alt != null ? nf(L.alt, 1) + ' m' : '—');
+  set('l_speed', L.spd != null ? nf(L.spd * 3.6, 1) + ' km/h' : '—');
+  set('l_head', L.hd != null && !isNaN(L.hd) ? nf(L.hd, 0) + '° ' + compass(L.hd) : '—');
+  relISS();
+}
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(function (p) {
+    var c = p.coords;
+    setLoc(c.latitude, c.longitude, 'GPS / device', { acc: c.accuracy, alt: c.altitude, spd: c.speed, hd: c.heading });
+  }, function (e) {
+    set('l_src', 'Device location ' + (e.code === 1 ? 'denied' : 'unavailable') + ' · using IP');
+  }, { maximumAge: 10000, timeout: 30000 });
+} else { set('l_src', 'Geolocation not supported · using IP'); }
+
+async function fnIP() {
+  var j, ip, city, region, country, lat, lon, tz, isp;
+  try {
+    j = await fx('https://ipapi.co/json/');
+    if (j.error) throw new Error('ipapi');
+    ip = j.ip; city = j.city; region = j.region; country = j.country_name; lat = j.latitude; lon = j.longitude; tz = j.timezone; isp = j.org;
+  } catch (e) {
+    j = await fx('https://ipwho.is/');
+    if (j.success === false) throw new Error('ipwho');
+    ip = j.ip; city = j.city; region = j.region; country = j.country; lat = j.latitude; lon = j.longitude;
+    tz = j.timezone && j.timezone.id; isp = j.connection && (j.connection.isp || j.connection.org);
+  }
+  set('l_ip', ip || '—');
+  set('l_isp', isp || '—');
+  set('l_tz', tz || '—');
+  set('l_place', [city, region, country].filter(Boolean).join(', ') || '—');
+  if (!S.loc || S.loc.src === 'IP address (approx.)') {
+    if (lat != null && lon != null) setLoc(+lat, +lon, 'IP address (approx.)');
+  }
+}
+
+/* ---------- ISS ---------- */
+function ecef(lat, lon, h) {
+  var r = 6371 + h, la = lat * RAD, lo = lon * RAD;
+  return [r * Math.cos(la) * Math.cos(lo), r * Math.cos(la) * Math.sin(lo), r * Math.sin(la)];
+}
+function relISS() {
+  if (!S.iss || !S.loc) return;
+  var a = ecef(S.loc.lat, S.loc.lon, (S.loc.alt || 0) / 1000), b = ecef(S.iss.lat, S.iss.lon, S.iss.alt);
+  var d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  var dist = Math.hypot(d[0], d[1], d[2]), un = Math.hypot(a[0], a[1], a[2]);
+  var el = Math.asin((d[0] * a[0] + d[1] * a[1] + d[2] * a[2]) / (dist * un)) * DEG;
+  live('i_dist', nf(dist, 0) + ' km');
+  live('i_elev', nf(el, 1) + '° ' + (el > 0 ? '(above your horizon)' : '(below your horizon)'));
+}
+async function fnISS() {
+  var j = await fx('https://api.wheretheiss.at/v1/satellites/25544');
+  S.iss = { lat: j.latitude, lon: j.longitude, alt: j.altitude, foot: j.footprint };
+  live('i_lat', fl(j.latitude, 4, 'N', 'S'));
+  live('i_lon', fl(j.longitude, 4, 'E', 'W'));
+  live('i_alt', nf(j.altitude, 1) + ' km');
+  live('i_vel', nf(j.velocity, 0) + ' km/h');
+  live('i_kms', nf(j.velocity / 3600, 3) + ' km/s');
+  live('i_vis', j.visibility);
+  live('i_foot', nf(j.footprint, 0) + ' km across');
+  relISS(); drawMap();
+}
+async function fnTrack() {
+  var now = Math.floor(Date.now() / 1000), ts = [], pts = [];
+  for (var i = -15; i <= 15; i++) ts.push(now + i * 180);
+  for (var k = 0; k < ts.length; k += 10) {
+    try {
+      var j = await fx('https://api.wheretheiss.at/v1/satellites/25544/positions?units=kilometers&timestamps=' + ts.slice(k, k + 10).join(','));
+      j.forEach(function (p) { pts.push({ t: p.timestamp, lat: p.latitude, lon: p.longitude }); });
+    } catch (e) { /* skip */ }
+    await sleep(1200);
+  }
+  if (!pts.length) throw new Error('no track');
+  S.track = pts.sort(function (a, b) { return a.t - b.t; });
+  drawMap();
+}
+function poly(g, pts, X, Y, w) {
+  g.beginPath();
+  var px = null;
+  pts.forEach(function (p, i) {
+    var x = X(p.lon), y = Y(p.lat);
+    if (i === 0 || Math.abs(x - px) > w / 2) g.moveTo(x, y); else g.lineTo(x, y);
+    px = x;
+  });
+  g.stroke();
+}
+function drawMap() {
+  var c = document.getElementById('map'); if (!c) return;
+  var w = Math.floor(c.clientWidth); if (w < 100) return;
+  var h = Math.floor(w / 2), dpr = window.devicePixelRatio || 1;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  var g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var X = function (lo) { return (lo + 180) / 360 * w; }, Y = function (la) { return (90 - la) / 180 * h; };
+  g.fillStyle = '#1a3560'; g.fillRect(0, 0, w, h);
+
+  var sc = sunCalc(Date.now()), de = (Math.abs(sc.dec) < 1e-4 ? 1e-4 : sc.dec) * RAD;
+  g.beginPath();
+  for (var x = 0; x <= w; x += 2) {
+    var lo = x / w * 360 - 180, H = (sc.gmst + lo - sc.ra) * RAD;
+    var la = Math.atan(-Math.cos(H) / Math.tan(de)) * DEG, y = Y(la);
+    if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  if (de > 0) { g.lineTo(w, h); g.lineTo(0, h); } else { g.lineTo(w, 0); g.lineTo(0, 0); }
+  g.closePath(); g.fillStyle = 'rgba(4,8,20,.55)'; g.fill();
+
+  g.lineWidth = 1; g.font = '10px ui-monospace, monospace'; g.fillStyle = 'rgba(190,205,235,.6)';
+  for (var lo2 = -180; lo2 <= 180; lo2 += 30) {
+    g.strokeStyle = lo2 === 0 ? 'rgba(190,205,235,.45)' : 'rgba(190,205,235,.17)';
+    g.beginPath(); g.moveTo(X(lo2), 0); g.lineTo(X(lo2), h); g.stroke();
+    if (lo2 > -180 && lo2 < 180) g.fillText(lo2 + '°', X(lo2) + 2, h - 3);
+  }
+  for (var la2 = -60; la2 <= 60; la2 += 30) {
+    g.strokeStyle = la2 === 0 ? 'rgba(190,205,235,.45)' : 'rgba(190,205,235,.17)';
+    g.beginPath(); g.moveTo(0, Y(la2)); g.lineTo(w, Y(la2)); g.stroke();
+    g.fillText(la2 + '°', 3, Y(la2) - 2);
+  }
+
+  if (S.track.length > 1) {
+    g.strokeStyle = 'rgba(92,200,255,.8)'; g.lineWidth = 1.5; g.setLineDash([4, 4]);
+    poly(g, S.track, X, Y, w); g.setLineDash([]);
+  }
+  if (S.iss) {
+    var rho = (S.iss.foot / 2) / 6371, la0 = S.iss.lat * RAD, fp = [];
+    for (var th = 0; th <= 360; th += 8) {
+      var t = th * RAD;
+      var la1 = Math.asin(Math.sin(la0) * Math.cos(rho) + Math.cos(la0) * Math.sin(rho) * Math.cos(t));
+      var lo1 = S.iss.lon * RAD + Math.atan2(Math.sin(t) * Math.sin(rho) * Math.cos(la0), Math.cos(rho) - Math.sin(la0) * Math.sin(la1));
+      fp.push({ lat: la1 * DEG, lon: mod(lo1 * DEG + 180, 360) - 180 });
+    }
+    g.strokeStyle = 'rgba(92,200,255,.35)'; g.lineWidth = 1; poly(g, fp, X, Y, w);
+  }
+  var sub = { lat: sc.dec, lon: mod(sc.ra - sc.gmst + 180, 360) - 180 };
+  g.fillStyle = '#ffd166'; g.beginPath(); g.arc(X(sub.lon), Y(sub.lat), 4.5, 0, 7); g.fill();
+  g.fillStyle = '#ffd166'; g.fillText('Sun', X(sub.lon) + 7, Y(sub.lat) + 3);
+  if (S.loc) {
+    g.strokeStyle = '#ffb86b'; g.lineWidth = 2; g.beginPath(); g.arc(X(S.loc.lon), Y(S.loc.lat), 5, 0, 7); g.stroke();
+    g.fillStyle = '#ffb86b'; g.fillText('You', X(S.loc.lon) + 8, Y(S.loc.lat) + 3);
+  }
+  if (S.iss) {
+    g.fillStyle = '#5cc8ff'; g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(X(S.iss.lon), Y(S.iss.lat), 5, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.fillText('ISS', X(S.iss.lon) + 8, Y(S.iss.lat) - 6);
+  }
+}
+addEventListener('resize', drawMap);
+
+/* ---------- weather & air ---------- */
+var WMO = { 0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',
+  53:'Drizzle',55:'Heavy drizzle',56:'Freezing drizzle',57:'Heavy freezing drizzle',61:'Light rain',63:'Rain',
+  65:'Heavy rain',66:'Freezing rain',67:'Heavy freezing rain',71:'Light snow',73:'Snow',75:'Heavy snow',
+  77:'Snow grains',80:'Light showers',81:'Showers',82:'Violent showers',85:'Snow showers',86:'Heavy snow showers',
+  95:'Thunderstorm',96:'Thunderstorm with hail',99:'Severe thunderstorm with hail' };
+var cf = function (c) { return nf(c, 1) + ' °C / ' + nf(C2F(c), 1) + ' °F'; };
+var spd = function (k) { return nf(k, 1) + ' km/h / ' + nf(k * 0.621371, 1) + ' mph'; };
+var hm = function (sec) { return Math.floor(sec / 3600) + ' h ' + pad((sec % 3600) / 60) + ' m'; };
+async function fnWx() {
+  var L = S.loc;
+  var u = 'https://api.open-meteo.com/v1/forecast?latitude=' + L.lat.toFixed(4) + '&longitude=' + L.lon.toFixed(4) +
+    '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m' +
+    '&hourly=uv_index,visibility,dew_point_2m&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,daylight_duration,sunshine_duration' +
+    '&timezone=auto&forecast_days=1';
+  var j = await fx(u), c = j.current, hr = parseInt(c.time.slice(11, 13), 10), h = j.hourly, d = j.daily;
+  live('w_cond', (WMO[c.weather_code] || 'Code ' + c.weather_code) + (c.is_day ? '' : ' (night)'));
+  live('w_temp', cf(c.temperature_2m));
+  live('w_feels', cf(c.apparent_temperature));
+  live('w_dew', cf(h.dew_point_2m[hr]));
+  live('w_hum', nf(c.relative_humidity_2m, 0) + ' %');
+  live('w_pres', nf(c.pressure_msl, 1) + ' hPa / ' + nf(c.pressure_msl * 0.02953, 2) + ' inHg');
+  live('w_pressfc', nf(c.surface_pressure, 1) + ' hPa');
+  live('w_wind', spd(c.wind_speed_10m));
+  live('w_dir', nf(c.wind_direction_10m, 0) + '° ' + compass(c.wind_direction_10m));
+  live('w_gust', spd(c.wind_gusts_10m));
+  live('w_cloud', nf(c.cloud_cover, 0) + ' %');
+  live('w_precip', nf(c.precipitation, 1) + ' mm');
+  live('w_vis', h.visibility[hr] != null ? nf(h.visibility[hr] / 1000, 1) + ' km' : '—');
+  live('w_uv', h.uv_index[hr] != null ? nf(h.uv_index[hr], 1) : '—');
+  live('w_uvmax', nf(d.uv_index_max[0], 1));
+  live('w_hi', cf(d.temperature_2m_max[0]));
+  live('w_lo', cf(d.temperature_2m_min[0]));
+  live('w_rise', d.sunrise[0].slice(11));
+  live('w_set', d.sunset[0].slice(11));
+  live('w_daylen', hm(d.daylight_duration[0]));
+  live('w_sun', hm(d.sunshine_duration[0]));
+  if (j.elevation != null) set('l_elev', nf(j.elevation, 0) + ' m / ' + nf(j.elevation * 3.28084, 0) + ' ft');
+}
+var aqiUS = function (v) { return v == null ? '—' : v + ' · ' + (v <= 50 ? 'Good' : v <= 100 ? 'Moderate' : v <= 150 ? 'Unhealthy for sensitive groups' : v <= 200 ? 'Unhealthy' : v <= 300 ? 'Very unhealthy' : 'Hazardous'); };
+var aqiEU = function (v) { return v == null ? '—' : v + ' · ' + (v <= 20 ? 'Good' : v <= 40 ? 'Fair' : v <= 60 ? 'Moderate' : v <= 80 ? 'Poor' : v <= 100 ? 'Very poor' : 'Extremely poor'); };
+async function fnAq() {
+  var L = S.loc;
+  var j = await fx('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + L.lat.toFixed(4) + '&longitude=' + L.lon.toFixed(4) +
+    '&current=us_aqi,european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,dust,aerosol_optical_depth&timezone=auto');
+  var c = j.current, u = function (v, d, s) { return v == null ? '—' : nf(v, d) + ' ' + s; };
+  live('a_us', aqiUS(c.us_aqi)); live('a_eu', aqiEU(c.european_aqi));
+  live('a_pm25', u(c.pm2_5, 1, 'µg/m³')); live('a_pm10', u(c.pm10, 1, 'µg/m³'));
+  live('a_co', u(c.carbon_monoxide, 0, 'µg/m³')); live('a_no2', u(c.nitrogen_dioxide, 1, 'µg/m³'));
+  live('a_so2', u(c.sulphur_dioxide, 1, 'µg/m³')); live('a_o3', u(c.ozone, 1, 'µg/m³'));
+  live('a_dust', u(c.dust, 1, 'µg/m³')); live('a_aod', c.aerosol_optical_depth == null ? '—' : nf(c.aerosol_optical_depth, 3));
+}
+async function fnCo2() {
+  var t = await fx('https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt', true);
+  var rows = t.split('\n').filter(function (l) { return l.trim() && l[0] !== '#'; });
+  for (var i = rows.length - 1; i >= 0; i--) {
+    var p = rows[i].trim().split(/\s+/), v = parseFloat(p[3]);
+    if (v > 0) { S.co2 = { v: v, label: 'NOAA monthly mean (' + p[0] + '-' + pad(p[1]) + ')' }; return; }
+  }
+  throw new Error('no data');
+}
+
+/* ---------- space weather ---------- */
+var SWU = 'https://services.swpc.noaa.gov';
+function lastWith(a, name) {
+  var hd = a[0], idx = hd.indexOf(name);
+  for (var i = a.length - 1; i > 0; i--) { if (isFinite(parseFloat(a[i][idx]))) return parseFloat(a[i][idx]); }
+  return null;
+}
+function flare(f) {
+  var L = [[1e-4,'X'],[1e-5,'M'],[1e-6,'C'],[1e-7,'B'],[1e-8,'A']];
+  for (var i = 0; i < L.length; i++) if (f >= L[i][0]) return L[i][1] + nf(f / L[i][0], 1);
+  return 'A (below 1.0)';
+}
+async function fnSw() {
+  var R = await Promise.allSettled([
+    fx(SWU + '/json/planetary_k_index_1m.json'), fx(SWU + '/products/solar-wind/plasma-2-hour.json'),
+    fx(SWU + '/products/solar-wind/mag-2-hour.json'), fx(SWU + '/products/summary/10cm-flux.json'),
+    fx(SWU + '/json/goes/primary/xrays-6-hour.json')]);
+  if (R.every(function (r) { return r.status !== 'fulfilled'; })) throw new Error('swpc');
+  if (R[0].status === 'fulfilled' && R[0].value.length) {
+    var e = R[0].value[R[0].value.length - 1];
+    var kp = e.estimated_kp != null ? e.estimated_kp : e.kp_index, r = Math.round(kp);
+    live('s_kp', nf(kp, 2));
+    live('s_g', r >= 9 ? 'G5 extreme' : r === 8 ? 'G4 severe' : r === 7 ? 'G3 strong' : r === 6 ? 'G2 moderate' : r === 5 ? 'G1 minor' : 'No storm (below G1)');
+  }
+  if (R[1].status === 'fulfilled') {
+    var a = R[1].value, sp = lastWith(a, 'speed'), dn = lastWith(a, 'density'), tp = lastWith(a, 'temperature');
+    live('s_speed', sp == null ? '—' : nf(sp, 1) + ' km/s');
+    live('s_dens', dn == null ? '—' : nf(dn, 2) + ' protons/cm³');
+    live('s_temp', tp == null ? '—' : nf(tp, 0) + ' K');
+  }
+  if (R[2].status === 'fulfilled') {
+    var m = R[2].value, bz = lastWith(m, 'bz_gsm'), bt = lastWith(m, 'bt');
+    live('s_bz', bz == null ? '—' : nf(bz, 2) + ' nT' + (bz < 0 ? ' (southward)' : ' (northward)'));
+    live('s_bt', bt == null ? '—' : nf(bt, 2) + ' nT');
+  }
+  if (R[3].status === 'fulfilled') live('s_flux', nf(parseFloat(R[3].value.Flux), 0) + ' sfu');
+  if (R[4].status === 'fulfilled') {
+    var x = R[4].value.filter(function (q) { return q.energy === '0.1-0.8nm' && q.flux != null; });
+    if (x.length) {
+      var fx1 = x[x.length - 1].flux;
+      live('s_xray', fx1.toExponential(2) + ' W/m²'); live('s_flare', flare(fx1));
+    }
+  }
+}
+
+/* ---------- earthquakes ---------- */
+async function fnEq() {
+  var j = await fx('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson');
+  var f = j.features.filter(function (q) { return q.properties.mag != null; }), now = Date.now();
+  live('q_day', nf(f.length));
+  live('q_hour', nf(f.filter(function (q) { return q.properties.time > now - 3600000; }).length));
+  live('q_m45', nf(f.filter(function (q) { return q.properties.mag >= 4.5; }).length));
+  if (f.length) {
+    var mx = f.reduce(function (a, b) { return b.properties.mag > a.properties.mag ? b : a; });
+    live('q_max', 'M' + nf(mx.properties.mag, 1));
+    live('q_maxplace', mx.properties.place || '—');
+    live('q_avg', nf(f.reduce(function (s, q) { return s + q.properties.mag; }, 0) / f.length, 2));
+    var last = f.reduce(function (a, b) { return b.properties.time > a.properties.time ? b : a; });
+    S.lastq = last.properties.time;
+    live('q_last', 'M' + nf(last.properties.mag, 1) + ' · ' + (last.properties.place || '—'));
+    if (S.loc) {
+      var best = null, bd = 1e9;
+      f.forEach(function (q) { var dd = hav(S.loc.lat, S.loc.lon, q.geometry.coordinates[1], q.geometry.coordinates[0]); if (dd < bd) { bd = dd; best = q; } });
+      if (best) live('q_closest', nf(bd, 0) + ' km · M' + nf(best.properties.mag, 1));
+    } else set('q_closest', 'Waiting for location');
+  }
+  try {
+    var s = await fx('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson');
+    live('q_sig', nf(s.features.length));
+  } catch (e) { /* optional */ }
+}
+
+/* ---------- markets & networks ---------- */
+async function fnCrypto() {
+  var j = await fx('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,dogecoin&vs_currencies=usd&include_24hr_change=true');
+  [['b_btc','bitcoin'],['b_eth','ethereum'],['b_sol','solana'],['b_doge','dogecoin']].forEach(function (p) {
+    var o = j[p[1]]; if (!o) return;
+    var ch = o.usd_24h_change;
+    live(p[0], '$' + nf(o.usd, o.usd < 1 ? 4 : 2) + (ch == null ? '' : '  ' + (ch >= 0 ? '▲' : '▼') + nf(Math.abs(ch), 2) + '%'));
+  });
+}
+async function fnBtc() {
+  var R = await Promise.allSettled([
+    fx('https://mempool.space/api/blocks/tip/height', true),
+    fx('https://mempool.space/api/v1/fees/recommended'),
+    fx('https://mempool.space/api/v1/difficulty-adjustment')]);
+  if (R.every(function (r) { return r.status !== 'fulfilled'; })) throw new Error('mempool');
+  if (R[0].status === 'fulfilled') {
+    var hgt = parseInt(R[0].value, 10), left = 1050000 - hgt;
+    live('b_height', nf(hgt));
+    live('b_halv', nf(left) + ' (≈ ' + nf(left / 144, 0) + ' days)');
+  }
+  if (R[1].status === 'fulfilled') live('b_fee', nf(R[1].value.fastestFee, 0) + ' sat/vB');
+  if (R[2].status === 'fulfilled') {
+    var d = R[2].value;
+    live('b_diff', (d.difficultyChange >= 0 ? '+' : '') + nf(d.difficultyChange, 2) + ' % in ' + nf(d.remainingBlocks) + ' blocks');
+  }
+}
+async function fnFx() {
+  var j, q = 'EUR,GBP,JPY,CAD,AUD,CNY';
+  try { j = await fx('https://api.frankfurter.dev/v1/latest?base=USD&symbols=' + q); }
+  catch (e) { j = await fx('https://api.frankfurter.app/latest?from=USD&to=' + q); }
+  [['f_eur','EUR',4],['f_gbp','GBP',4],['f_jpy','JPY',3],['f_cad','CAD',4],['f_aud','AUD',4],['f_cny','CNY',4]].forEach(function (p) {
+    if (j.rates[p[1]] != null) live(p[0], nf(j.rates[p[1]], p[2]));
+  });
+  live('f_date', j.date);
+}
+
+/* ---------- people in space & airspace ---------- */
+async function fnPpl() {
+  var j = await fx('https://corquaid.github.io/international-space-station-APIs/JSON/people-in-space.json');
+  var people = j.people || [], by = {};
+  people.forEach(function (p) { by[p.spacecraft || 'Unknown'] = (by[p.spacecraft || 'Unknown'] || 0) + 1; });
+  live('h_space', nf(j.number != null ? j.number : people.length));
+  live('h_craft', Object.keys(by).map(function (k) { return k + ': ' + by[k]; }).join(' · ') || '—');
+}
+async function fnAir() {
+  var L = S.loc;
+  var j = await fx('https://opensky-network.org/api/states/all?lamin=' + (L.lat - 1).toFixed(3) + '&lomin=' + (L.lon - 1).toFixed(3) +
+    '&lamax=' + (L.lat + 1).toFixed(3) + '&lomax=' + (L.lon + 1).toFixed(3));
+  var st = j.states || [], air = st.filter(function (s) { return !s[8]; });
+  live('p_total', nf(st.length)); live('p_air', nf(air.length)); live('p_gnd', nf(st.length - air.length));
+  var hi = air.filter(function (s) { return s[7] != null; }).sort(function (a, b) { return b[7] - a[7]; })[0];
+  var fa = air.filter(function (s) { return s[9] != null; }).sort(function (a, b) { return b[9] - a[9]; })[0];
+  live('p_hi', hi ? nf(hi[7] * 3.28084, 0) + ' ft · ' + ((hi[1] || '').trim() || hi[0]) : '—');
+  live('p_fast', fa ? nf(fa[9] * 2.23694, 0) + ' mph · ' + ((fa[1] || '').trim() || fa[0]) : '—');
+  var cnt = {}; st.forEach(function (s) { cnt[s[2]] = (cnt[s[2]] || 0) + 1; });
+  var top = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0];
+  live('p_origin', top ? top + ' (' + cnt[top] + ')' : '—');
+}
+
+/* ---------- register feeds & start ---------- */
+job('ip',     'loc',     1800000, fnIP);
+job('iss',    'iss',     5000,    fnISS);
+job('track',  'map',     1200000, fnTrack);
+job('wx',     'wx',      600000,  fnWx, true);
+job('aq',     'aq',      900000,  fnAq, true);
+job('co2',    'climate', 3600000, fnCo2);
+job('sw',     'sw',      60000,   fnSw);
+job('eq',     'eq',      120000,  fnEq);
+job('crypto', 'mk',      60000,   fnCrypto);
+job('btc',    'mk',      90000,   fnBtc);
+job('fx',     'mk',      3600000, fnFx);
+job('ppl',    'hum',     3600000, fnPpl);
+job('air',    'air',     300000,  fnAir, true);
+
+function safe(fn) { return function () { try { fn(); } catch (e) { if (window.console) console.error(e); } }; }
+var tickFast = safe(fast), tickSlow = safe(slow);
+tickFast(); tickSlow(); hdr(); drawMap();
+setInterval(tickFast, 100);
+setInterval(tickSlow, 1000);
+setInterval(function () { drawMap(); }, 10000);
+setInterval(schedule, 1000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) schedule(); });
+schedule();
+})();
+</script>
 </body>
 </html>
