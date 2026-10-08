@@ -8,21 +8,20 @@
 <title>Live Metrics</title>
 <style>
   :root {
-    --bg: #f2f2f7; --card: #ffffff; --sep: rgba(60,60,67,.18);
+    color-scheme: light dark;
+    --bg: #f2f2f7; --card: #ffffff; --sep: rgba(60,60,67,.18); --hover: rgba(0,0,0,.025);
     --label: #6e6e73; --text: #1d1d1f; --accent: #0071e3;
     --green: #34c759; --orange: #ff9500;
     --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
     --hdr: rgba(242,242,247,.75);
-    --map-day: #dde8f6; --map-night: rgba(25,35,70,.22); --map-grid: rgba(60,60,67,.13);
-    --map-text: rgba(60,60,67,.5); --map-track: #0071e3; --map-you: #ff9500; --map-sun: #ffb300;
+    --seg: rgba(118,118,128,.12); --segon: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000000; --card: #1c1c1e; --sep: rgba(84,84,88,.55);
+      --bg: #000000; --card: #1c1c1e; --sep: rgba(84,84,88,.55); --hover: rgba(255,255,255,.04);
       --label: #98989d; --text: #f5f5f7; --accent: #0a84ff;
       --green: #30d158; --orange: #ff9f0a; --shadow: none; --hdr: rgba(0,0,0,.72);
-      --map-day: #1d2c45; --map-night: rgba(0,0,0,.5); --map-grid: rgba(235,235,245,.11);
-      --map-text: rgba(235,235,245,.45); --map-track: #0a84ff; --map-you: #ff9f0a; --map-sun: #ffd60a;
+      --seg: rgba(118,118,128,.24); --segon: #636366;
     }
   }
   * { box-sizing: border-box; }
@@ -31,6 +30,7 @@
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+  button { font: inherit; color: inherit; }
   header {
     position: sticky; top: 0; z-index: 5;
     background: var(--hdr);
@@ -39,69 +39,108 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
   .hin {
-    max-width: 1400px; margin: 0 auto; padding: 14px 20px 12px;
-    display: flex; align-items: center; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap;
+    max-width: 1400px; margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap;
   }
+  .hl { display: flex; flex-direction: column; gap: 2px; }
   h1 { font-size: 28px; line-height: 1.1; font-weight: 700; letter-spacing: -.022em; margin: 0; }
   #hdr { color: var(--label); font-size: 13px; display: flex; align-items: center; gap: 8px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); transition: background .4s; }
   .dot.on { background: var(--green); }
+  .ctl { display: flex; align-items: center; gap: 16px; }
+  .txt { appearance: none; border: 0; background: none; color: var(--accent); font-size: 14px; cursor: pointer; padding: 6px 2px; }
+  .txt:active { opacity: .5; }
+  .seg { display: inline-flex; background: var(--seg); border-radius: 9px; padding: 2px; }
+  .seg button {
+    appearance: none; border: 0; background: none; font-size: 13px; font-weight: 500;
+    padding: 5px 14px; border-radius: 7px; cursor: pointer; transition: background .2s, box-shadow .2s;
+  }
+  .seg button.on { background: var(--segon); box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 1px rgba(0,0,0,.2); }
   main { max-width: 1400px; margin: 0 auto; padding: 22px 20px; }
   #grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-    gap: 26px 20px; align-items: start;
+    gap: 16px; align-items: start;
   }
-  .sec { animation: rise .5s ease both; }
-  .sec.span2 { grid-column: span 2; }
-  .sh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 16px 7px; }
-  .sh b { font-size: 13px; font-weight: 600; color: var(--label); text-transform: uppercase; letter-spacing: .02em; }
+  .sec {
+    background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
+    animation: rise .5s ease both;
+  }
+  .sh {
+    appearance: none; border: 0; background: none; width: 100%; text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; padding: 13px 16px;
+    border-bottom: 1px solid var(--sep); transition: border-color .3s, background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sh:hover { background: var(--hover); }
+  .sh:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 14px; }
+  .sec.closed .sh { border-bottom-color: transparent; }
+  .sh b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; flex: 1; }
   .sh i { font-style: normal; font-size: 12px; color: var(--label); text-align: right; }
   .sh i.off { color: var(--orange); }
-  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .chev { color: var(--label); display: flex; transition: transform .3s ease; }
+  .sec.closed .chev { transform: rotate(-90deg); }
+  .cw { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .35s cubic-bezier(.4,0,.2,1); }
+  .sec.closed .cw { grid-template-rows: 0fr; }
+  .card { min-height: 0; overflow: hidden; }
   .row {
     display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
     padding: 10px 16px; position: relative; font-size: 14px;
   }
-  .row + .row::before {
+  .k small { display: block; font-size: 12px; color: var(--label); margin-top: 2px; }
+  .livedot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    margin-right: 6px; vertical-align: 1px; animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .row + .row::before, .games > .row:first-child::before {
     content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px;
     background: var(--sep); transform: scaleY(.5); transform-origin: top;
   }
-  .k { color: var(--text); flex: 0 1 auto; }
+  .k { flex: 0 1 auto; }
   .v { color: var(--label); text-align: right; font-variant-numeric: tabular-nums; word-break: break-word; }
   .v.f { animation: tint 1.4s ease-out; }
   @keyframes tint { from { color: var(--accent); } to { color: var(--label); } }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  canvas { width: 100%; height: auto; display: block; }
   footer {
     max-width: 1400px; margin: 0 auto; padding: 4px 36px calc(40px + env(safe-area-inset-bottom, 0px));
     color: var(--label); font-size: 12px; line-height: 1.5;
   }
   @media (max-width: 720px) {
-    .sec.span2 { grid-column: span 1; }
     main { padding: 16px 12px; }
-    .hin { padding: 12px 16px 10px; }
+    .hin { padding: 10px 16px; }
     h1 { font-size: 24px; }
     footer { padding-left: 28px; padding-right: 28px; }
   }
-  @media (prefers-reduced-motion: reduce) { .sec, .v.f { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .sec, .v.f, .livedot { animation: none; }
+    .cw, .chev, .seg button { transition: none; }
+  }
 </style>
 </head>
 <body>
 
 <header>
   <div class="hin">
-    <h1>Live Metrics</h1>
-    <div id="hdr"><span class="dot" id="dot"></span><span id="hdrt">Starting…</span></div>
+    <div class="hl">
+      <h1>Live Metrics</h1>
+      <div id="hdr"><span class="dot" id="dot"></span><span id="hdrt">Starting…</span></div>
+    </div>
+    <div class="ctl">
+      <button class="txt" id="allbtn" type="button">Collapse all</button>
+      <div class="seg" role="group" aria-label="Units">
+        <button id="u-met" type="button">Metric</button><button id="u-imp" type="button">Imperial</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <main><div id="grid"></div></main>
 
 <footer>
-  Feeds: wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
+  Feeds: ESPN (MLB and NFL scoreboards), wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
   OpenSky, ipapi / ipwho.is, ISS crew list on GitHub Pages. Anything marked "est." or "≈" is computed or
   modelled in your browser (sun, moon, sidereal time, population, Voyager 1, CO₂ fallback). If a feed
-  is blocked or rate-limited, its panel says offline and retries on its own.
+  is blocked or rate-limited, its panel says offline and retries on its own. Historical sports records are fixed values from mid-2026 and don't update themselves.
 </footer>
 
 <script>
@@ -111,7 +150,7 @@
 /* ---------- constants & helpers ---------- */
 var RAD = Math.PI / 180, DEG = 180 / Math.PI;
 var T0 = Date.now();
-var S = { loc: null, iss: null, track: [], reqs: 0, fail: 0, lat: null, ok: new Set(), bad: new Set(),
+var S = { loc: null, iss: null, raw: {}, qbest: null, airx: null, reqs: 0, fail: 0, lat: null, ok: new Set(), bad: new Set(),
           co2: null, lastq: null, fps: 0, mx: null, my: null, vorb: 29.78 };
 
 var pad = function (n, w) { return String(Math.trunc(n)).padStart(w || 2, '0'); };
@@ -140,6 +179,22 @@ var DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','
 var compass = function (deg) { return DIRS[Math.round(mod(deg, 360) / 22.5) % 16]; };
 var fl = function (v, p, n, s) { return nf(Math.abs(v), p) + '° ' + (v >= 0 ? n : s); };
 var C2F = function (c) { return c * 9 / 5 + 32; };
+var IMP = (function () {
+  try { var u = localStorage.getItem('lm_units'); if (u) return u === 'imp'; } catch (e) {}
+  return /^en-(us|lr)$/i.test(navigator.language || '');
+})();
+var nn = function (v) { return v == null || !isFinite(v); };
+var fT = function (c) { return nn(c) ? '—' : IMP ? nf(C2F(c), 1) + ' °F' : nf(c, 1) + ' °C'; };
+var fSp = function (kmh, d) { d = d == null ? 1 : d; return nn(kmh) ? '—' : IMP ? nf(kmh * 0.621371, d) + ' mph' : nf(kmh, d) + ' km/h'; };
+var fMs = function (ms) { return IMP ? nf(ms * 2.236936, 1) + ' mph' : nf(ms, 1) + ' m/s'; };
+var fD = function (km, d) { return nn(km) ? '—' : IMP ? nf(km * 0.621371, d) + ' mi' : nf(km, d) + ' km'; };
+var fH = function (m) { return nn(m) ? '—' : IMP ? nf(m * 3.28084, 0) + ' ft' : nf(m, 0) + ' m'; };
+var fV = function (m) { return IMP ? nf(m / 1609.344, 1) + ' mi' : nf(m / 1000, 1) + ' km'; };
+var fP = function (h) { return nn(h) ? '—' : IMP ? nf(h * 0.02953, 2) + ' inHg' : nf(h, 1) + ' hPa'; };
+var fR = function (mm) { return nn(mm) ? '—' : IMP ? nf(mm / 25.4, 2) + ' in' : nf(mm, 1) + ' mm'; };
+var fW = function (t) { return IMP ? nf(t * 1.10231, 0) + ' tons' : nf(t, 0) + ' tonnes'; };
+function loadJSON(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function hav(la1, lo1, la2, lo2) {
   var dLa = (la2 - la1) * RAD, dLo = (lo2 - lo1) * RAD;
   var a = Math.sin(dLa / 2) * Math.sin(dLa / 2) +
@@ -159,7 +214,7 @@ var SCHEMA = [
   ['t_maya','Mayan Long Count'],['t_ny','Until New Year'],['t_moon','Since Moon landing'],['t_y2k','Since Y2K']
 ]},
 { id: 'earth', title: 'Earth & Sun', rows: [
-  ['e_au','Earth–Sun distance'],['e_km','Earth–Sun distance (km)'],['e_light','Sunlight travel time'],
+  ['e_au','Earth–Sun distance (AU)'],['e_km','Earth–Sun distance'],['e_light','Sunlight travel time'],
   ['e_vorb','Orbital speed'],['e_vrot','Rotation speed at you'],['e_odo','Orbited since page opened'],
   ['e_gal','Galactic travel since opened'],['e_dec','Solar declination'],['e_eot','Equation of time'],
   ['e_sub','Sub-solar point'],['e_alt','Sun altitude'],['e_az','Sun azimuth'],['e_phase','Sun phase'],
@@ -175,7 +230,6 @@ var SCHEMA = [
   ['i_vis','Visibility'],['i_foot','Footprint'],['i_dist','Distance from you'],['i_elev','Elevation from you'],
   ['i_per','Orbital period']
 ]},
-{ id: 'map', title: 'ISS ground track', wide: true, map: true, rows: [] },
 { id: 'loc', title: 'Your location', rows: [
   ['l_src','Source'],['l_lat','Latitude'],['l_lon','Longitude'],['l_acc','Accuracy'],['l_alt','Device altitude'],
   ['l_elev','Ground elevation'],['l_speed','Speed'],['l_head','Heading'],['l_place','Place (IP-based)'],
@@ -213,10 +267,34 @@ var SCHEMA = [
   ['f_eur','1 USD in EUR'],['f_gbp','1 USD in GBP'],['f_jpy','1 USD in JPY'],['f_cad','1 USD in CAD'],
   ['f_aud','1 USD in AUD'],['f_cny','1 USD in CNY'],['f_date','FX rates as of']
 ]},
+{ id: 'mlb', title: 'MLB', games: true, rows: [
+  ['mb_stage','Season'],['mb_games','Games today'],['mb_live','Live now'],['mb_final','Final'],
+  ['mb_runs','Runs scored today'],['mb_next','Next first pitch']
+]},
+{ id: 'nfl', title: 'NFL', games: true, rows: [
+  ['nf_week','Week'],['nf_games','Games this week'],['nf_live','Live now'],['nf_final','Final'],
+  ['nf_pts','Points scored this week'],['nf_next','Next kickoff']
+]},
+{ id: 'mlbh', title: 'MLB history', rows: [
+  ['mh_ws','Most World Series titles'],['mh_champ','Reigning champion'],['mh_played','World Series played'],
+  ['mh_hr','Career home runs'],['mh_hrs','Single-season home runs'],['mh_hits','Career hits'],['mh_rbi','Career RBI'],
+  ['mh_sb','Career stolen bases'],['mh_streak','Longest hitting streak'],['mh_iron','Consecutive games played'],
+  ['mh_400','Last .400 season'],['mh_w','Career pitching wins'],['mh_k','Career strikeouts'],['mh_sv','Career saves'],
+  ['mh_team','Most team wins in a season'],['mh_5050','First 50/50 season'],
+  ['mh_nl','Since the National League began'],['mh_first','Since the first World Series']
+]},
+{ id: 'nflh', title: 'NFL history', rows: [
+  ['nh_sb','Most Super Bowl titles'],['nh_champ','Reigning champion'],['nh_played','Super Bowls played'],
+  ['nh_next','Next Super Bowl (LXI)'],['nh_pyd','Career passing yards'],['nh_ptd','Career passing TDs'],
+  ['nh_ryd','Career rushing yards'],['nh_wyd','Career receiving yards'],['nh_td','Career touchdowns'],
+  ['nh_spyd','Single-season passing yards'],['nh_sptd','Single-season passing TDs'],['nh_sryd','Single-season rushing yards'],
+  ['nh_sack','Single-season sacks'],['nh_rings','Most Super Bowl wins (player)'],['nh_perfect','Only perfect season'],
+  ['nh_score','Highest-scoring game'],['nh_since','Since the NFL was founded'],['nh_first','Since Super Bowl I']
+]},
 { id: 'hum', title: 'Humanity & beyond', rows: [
   ['h_pop','World population (est.)'],['h_births','Births today, UTC (est.)'],['h_deaths','Deaths today, UTC (est.)'],
-  ['h_space','People in space now'],['h_craft','By spacecraft'],['h_v1','Voyager 1 distance (est.)'],
-  ['h_v1km','Voyager 1 distance (km)'],['h_v1lt','Voyager 1 light-time'],['h_v1v','Voyager 1 speed']
+  ['h_space','People in space now'],['h_craft','By spacecraft'],['h_v1','Voyager 1 distance (AU, est.)'],
+  ['h_v1km','Voyager 1 distance (est.)'],['h_v1lt','Voyager 1 light-time'],['h_v1v','Voyager 1 speed']
 ]},
 { id: 'air', title: 'Airspace near you (±1°)', rows: [
   ['p_total','Aircraft tracked'],['p_air','Airborne'],['p_gnd','On ground'],['p_hi','Highest altitude'],
@@ -237,19 +315,24 @@ var SCHEMA = [
 
 /* ---------- build the DOM ---------- */
 var VAL = {}, PANEL = {}, METRICS = 0;
+var GAMES = {};
+var CLOSED = loadJSON('lm_closed', []);
 (function build() {
   var grid = document.getElementById('grid');
-  SCHEMA.forEach(function (p) {
+  SCHEMA.forEach(function (p, idx) {
     var s = document.createElement('section');
-    s.className = 'sec' + (p.wide ? ' span2' : '');
-    s.style.animationDelay = Math.min(SCHEMA.indexOf(p) * 30, 400) + 'ms';
-    var h = document.createElement('div'); h.className = 'sh';
+    s.className = 'sec'; s.id = 'sec-' + p.id;
+    s.style.animationDelay = Math.min(idx * 30, 400) + 'ms';
+    var btn = document.createElement('button'); btn.className = 'sh'; btn.type = 'button';
     var b = document.createElement('b'); b.textContent = p.title;
-    var i = document.createElement('i'); i.textContent = '';
-    h.appendChild(b); h.appendChild(i); s.appendChild(h);
-    PANEL[p.id] = i;
-    var card = document.createElement('div'); card.className = 'card'; s.appendChild(card);
-    if (p.map) { var c = document.createElement('canvas'); c.id = 'map'; c.width = 720; c.height = 360; card.appendChild(c); }
+    var i = document.createElement('i');
+    var ch = document.createElement('span'); ch.className = 'chev';
+    ch.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.appendChild(b); btn.appendChild(i); btn.appendChild(ch);
+    s.appendChild(btn); PANEL[p.id] = i;
+    var cw = document.createElement('div'); cw.className = 'cw';
+    var card = document.createElement('div'); card.className = 'card';
+    cw.appendChild(card); s.appendChild(cw);
     p.rows.forEach(function (r) {
       var row = document.createElement('div'); row.className = 'row';
       var k = document.createElement('span'); k.className = 'k'; k.textContent = r[1];
@@ -257,9 +340,24 @@ var VAL = {}, PANEL = {}, METRICS = 0;
       row.appendChild(k); row.appendChild(v); card.appendChild(row);
       VAL[r[0]] = v; METRICS++;
     });
+    if (p.games) { var gb = document.createElement('div'); gb.className = 'games'; card.appendChild(gb); GAMES[p.id] = gb; }
+    btn.onclick = function () { toggleSec(p.id); };
     grid.appendChild(s);
   });
 })();
+function applyClosed() {
+  SCHEMA.forEach(function (p) {
+    var s = document.getElementById('sec-' + p.id), c = CLOSED.indexOf(p.id) >= 0;
+    s.classList.toggle('closed', c);
+    s.firstChild.setAttribute('aria-expanded', c ? 'false' : 'true');
+  });
+  document.getElementById('allbtn').textContent = CLOSED.length >= SCHEMA.length ? 'Expand all' : 'Collapse all';
+}
+function toggleSec(id) {
+  var i = CLOSED.indexOf(id);
+  if (i >= 0) CLOSED.splice(i, 1); else CLOSED.push(id);
+  saveJSON('lm_closed', CLOSED); applyClosed();
+}
 
 function set(k, v, flash) {
   var e = VAL[k]; if (!e) return;
@@ -403,9 +501,9 @@ function fast() {
   set('t_y2k', dur(ms - Date.UTC(2000, 0, 1)));
 
   var up = (ms - T0) / 1000;
-  set('e_odo', nf(up * S.vorb, 1) + ' km');
-  set('e_gal', nf(up * 230, 0) + ' km');
-  set('c_emit', nf(up * 1185, 0) + ' tonnes');
+  set('e_odo', fD(up * S.vorb, 1));
+  set('e_gal', fD(up * 230, 0));
+  set('c_emit', fW(up * 1185));
 
   var pop = 8.23e9 + (ms - Date.UTC(2025, 6, 1)) / 1000 * 2.218;
   set('h_pop', nf(pop, 0));
@@ -414,10 +512,10 @@ function fast() {
   set('h_deaths', nf(sod * 1.97, 0));
   var au = 173.14 + 3.57 * ((ms - Date.UTC(2026, 10, 15)) / 31557600000);
   set('h_v1', nf(au, 5) + ' AU');
-  set('h_v1km', nf(au * 149597870.7, 0) + ' km');
+  set('h_v1km', fD(au * 149597870.7, 0));
   var lt = au * 499.004784;
   set('h_v1lt', Math.floor(lt / 3600) + ' h ' + pad((lt % 3600) / 60) + ' m ' + pad(lt % 60) + ' s');
-  set('h_v1v', '≈ 16.9 km/s');
+  set('h_v1v', '≈ ' + (IMP ? fSp(60840, 0) : '16.9 km/s'));
 
   set('d_up', dur(ms - T0));
   if (S.mx != null) set('d_mouse', S.mx + ', ' + S.my);
@@ -441,12 +539,12 @@ function slow() {
   var sc = sunCalc(ms), loc = S.loc;
   var rkm = sc.R * 149597870.7;
   set('e_au', nf(sc.R, 6) + ' AU');
-  set('e_km', nf(rkm, 0) + ' km');
+  set('e_km', fD(rkm, 0));
   var lsec = rkm / 299792.458;
   set('e_light', Math.floor(lsec / 60) + ' min ' + nf(lsec % 60, 1) + ' s');
   S.vorb = Math.sqrt(1.32712440018e11 * (2 / rkm - 1 / 149597870.7));
-  set('e_vorb', nf(S.vorb, 3) + ' km/s (' + nf(S.vorb * 3600, 0) + ' km/h)');
-  set('e_vrot', nf(465.1 * Math.cos((loc ? loc.lat : 0) * RAD), 1) + ' m/s' + (loc ? '' : ' (equator)'));
+  set('e_vorb', IMP ? fSp(S.vorb * 3600, 0) : nf(S.vorb, 3) + ' km/s (' + nf(S.vorb * 3600, 0) + ' km/h)');
+  set('e_vrot', fMs(465.1 * Math.cos((loc ? loc.lat : 0) * RAD)) + (loc ? '' : ' (equator)'));
   set('e_dec', nf(sc.dec, 3) + '°');
   set('e_eot', (sc.eot >= 0 ? '+' : '−') + nf(Math.abs(sc.eot), 2) + ' min');
   set('e_sub', fl(sc.dec, 2, 'N', 'S') + ', ' + fl(mod(sc.ra - sc.gmst + 180, 360) - 180, 2, 'E', 'W'));
@@ -484,7 +582,7 @@ function slow() {
   set('m_illum', nf((1 - Math.cos(2 * Math.PI * mf)) / 2 * 100, 1) + ' %');
   set('m_age', nf(age, 2) + ' days');
   set('m_cycle', nf(mf * 100, 1) + ' %');
-  set('m_dist', '≈ ' + nf(mdist, 0) + ' km');
+  set('m_dist', '≈ ' + fD(mdist, 0));
   var toFull = mod(SYN / 2 - age, SYN) * 86400000, toNew = (SYN - age) * 86400000;
   set('m_full', new Date(ms + toFull).toLocaleString(undefined, shortDT) + ' (in ' + dur(toFull) + ')');
   set('m_new', new Date(ms + toNew).toLocaleString(undefined, shortDT) + ' (in ' + dur(toNew) + ')');
@@ -500,6 +598,14 @@ function slow() {
   set('c_co2', nf(co2, 2) + ' ppm');
   set('c_src', src);
   set('c_x', '+' + nf(co2 - 280, 1) + ' ppm (+' + nf((co2 / 280 - 1) * 100, 1) + ' %)');
+
+  /* sports history counters */
+  set('mh_nl', dur(ms - Date.UTC(1876, 1, 2)));
+  set('mh_first', dur(ms - Date.UTC(1903, 9, 1, 20)));
+  set('nh_since', dur(ms - Date.UTC(1920, 8, 17)));
+  set('nh_first', dur(ms - Date.UTC(1967, 0, 15, 21, 15)));
+  var sb = Date.UTC(2027, 1, 14, 23, 30);
+  set('nh_next', sb > ms ? new Date(sb).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' · in ' + dur(sb - ms) : 'Played Feb 14, 2027');
 
   /* quake age */
   if (S.lastq) set('q_ago', dur(ms - S.lastq));
@@ -594,12 +700,15 @@ function setLoc(lat, lon, src, extra) {
   set('l_src', src);
   set('l_lat', fl(lat, 5, 'N', 'S'));
   set('l_lon', fl(lon, 5, 'E', 'W'));
-  var L = S.loc;
-  set('l_acc', L.acc != null ? '± ' + nf(L.acc, 0) + ' m' : 'City-level (≈ 5–50 km)');
-  set('l_alt', L.alt != null ? nf(L.alt, 1) + ' m' : '—');
-  set('l_speed', L.spd != null ? nf(L.spd * 3.6, 1) + ' km/h' : '—');
-  set('l_head', L.hd != null && !isNaN(L.hd) ? nf(L.hd, 0) + '° ' + compass(L.hd) : '—');
+  locRows();
   relISS();
+}
+function locRows() {
+  var L = S.loc; if (!L) return;
+  set('l_acc', L.acc != null ? '± ' + fH(L.acc) : IMP ? 'City-level (≈ 3–30 mi)' : 'City-level (≈ 5–50 km)');
+  set('l_alt', L.alt != null ? fH(L.alt) : '—');
+  set('l_speed', L.spd != null ? fSp(L.spd * 3.6, 1) : '—');
+  set('l_head', L.hd != null && !isNaN(L.hd) ? nf(L.hd, 0) + '° ' + compass(L.hd) : '—');
 }
 if (navigator.geolocation) {
   navigator.geolocation.watchPosition(function (p) {
@@ -642,104 +751,25 @@ function relISS() {
   var d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
   var dist = Math.hypot(d[0], d[1], d[2]), un = Math.hypot(a[0], a[1], a[2]);
   var el = Math.asin((d[0] * a[0] + d[1] * a[1] + d[2] * a[2]) / (dist * un)) * DEG;
-  live('i_dist', nf(dist, 0) + ' km');
+  live('i_dist', fD(dist, 0));
   live('i_elev', nf(el, 1) + '° ' + (el > 0 ? '(above your horizon)' : '(below your horizon)'));
 }
 async function fnISS() {
   var j = await fx('https://api.wheretheiss.at/v1/satellites/25544');
-  S.iss = { lat: j.latitude, lon: j.longitude, alt: j.altitude, foot: j.footprint };
-  live('i_lat', fl(j.latitude, 4, 'N', 'S'));
-  live('i_lon', fl(j.longitude, 4, 'E', 'W'));
-  live('i_alt', nf(j.altitude, 1) + ' km');
-  live('i_vel', nf(j.velocity, 0) + ' km/h');
-  live('i_kms', nf(j.velocity / 3600, 3) + ' km/s');
-  live('i_vis', j.visibility);
-  live('i_foot', nf(j.footprint, 0) + ' km across');
-  relISS(); drawMap();
+  S.iss = { lat: j.latitude, lon: j.longitude, alt: j.altitude, foot: j.footprint, vel: j.velocity, vis: j.visibility };
+  rIss();
 }
-async function fnTrack() {
-  var now = Math.floor(Date.now() / 1000), ts = [], pts = [];
-  for (var i = -15; i <= 15; i++) ts.push(now + i * 180);
-  for (var k = 0; k < ts.length; k += 10) {
-    try {
-      var j = await fx('https://api.wheretheiss.at/v1/satellites/25544/positions?units=kilometers&timestamps=' + ts.slice(k, k + 10).join(','));
-      j.forEach(function (p) { pts.push({ t: p.timestamp, lat: p.latitude, lon: p.longitude }); });
-    } catch (e) { /* skip */ }
-    await sleep(1200);
-  }
-  if (!pts.length) throw new Error('no track');
-  S.track = pts.sort(function (a, b) { return a.t - b.t; });
-  drawMap();
+function rIss() {
+  var I = S.iss; if (!I) return;
+  live('i_lat', fl(I.lat, 4, 'N', 'S'));
+  live('i_lon', fl(I.lon, 4, 'E', 'W'));
+  live('i_alt', fD(I.alt, 1));
+  live('i_vel', fSp(I.vel, 0));
+  live('i_kms', IMP ? nf(I.vel * 0.621371 / 3600, 3) + ' mi/s' : nf(I.vel / 3600, 3) + ' km/s');
+  live('i_vis', I.vis);
+  live('i_foot', fD(I.foot, 0) + ' across');
+  relISS();
 }
-function poly(g, pts, X, Y, w) {
-  g.beginPath();
-  var px = null;
-  pts.forEach(function (p, i) {
-    var x = X(p.lon), y = Y(p.lat);
-    if (i === 0 || Math.abs(x - px) > w / 2) g.moveTo(x, y); else g.lineTo(x, y);
-    px = x;
-  });
-  g.stroke();
-}
-function drawMap() {
-  var c = document.getElementById('map'); if (!c) return;
-  var w = Math.floor(c.clientWidth); if (w < 100) return;
-  var h = Math.floor(w / 2), dpr = window.devicePixelRatio || 1;
-  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  var g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  var X = function (lo) { return (lo + 180) / 360 * w; }, Y = function (la) { return (90 - la) / 180 * h; };
-  var cs = getComputedStyle(document.documentElement), cv = function (n) { return cs.getPropertyValue(n).trim(); };
-  g.fillStyle = cv('--map-day'); g.fillRect(0, 0, w, h);
-
-  var sc = sunCalc(Date.now()), de = (Math.abs(sc.dec) < 1e-4 ? 1e-4 : sc.dec) * RAD;
-  g.beginPath();
-  for (var x = 0; x <= w; x += 2) {
-    var lo = x / w * 360 - 180, H = (sc.gmst + lo - sc.ra) * RAD;
-    var la = Math.atan(-Math.cos(H) / Math.tan(de)) * DEG, y = Y(la);
-    if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
-  }
-  if (de > 0) { g.lineTo(w, h); g.lineTo(0, h); } else { g.lineTo(w, 0); g.lineTo(0, 0); }
-  g.closePath(); g.fillStyle = cv('--map-night'); g.fill();
-
-  g.lineWidth = 1; g.font = '500 10px -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif'; g.fillStyle = cv('--map-text');
-  for (var lo2 = -180; lo2 <= 180; lo2 += 30) {
-    g.strokeStyle = cv('--map-grid');
-    g.beginPath(); g.moveTo(X(lo2), 0); g.lineTo(X(lo2), h); g.stroke();
-    if (lo2 > -180 && lo2 < 180) g.fillText(lo2 + '°', X(lo2) + 2, h - 3);
-  }
-  for (var la2 = -60; la2 <= 60; la2 += 30) {
-    g.strokeStyle = cv('--map-grid');
-    g.beginPath(); g.moveTo(0, Y(la2)); g.lineTo(w, Y(la2)); g.stroke();
-    g.fillText(la2 + '°', 3, Y(la2) - 2);
-  }
-
-  if (S.track.length > 1) {
-    g.strokeStyle = cv('--map-track'); g.globalAlpha = .7; g.lineWidth = 1.5; g.setLineDash([4, 4]);
-    poly(g, S.track, X, Y, w); g.setLineDash([]); g.globalAlpha = 1;
-  }
-  if (S.iss) {
-    var rho = (S.iss.foot / 2) / 6371, la0 = S.iss.lat * RAD, fp = [];
-    for (var th = 0; th <= 360; th += 8) {
-      var t = th * RAD;
-      var la1 = Math.asin(Math.sin(la0) * Math.cos(rho) + Math.cos(la0) * Math.sin(rho) * Math.cos(t));
-      var lo1 = S.iss.lon * RAD + Math.atan2(Math.sin(t) * Math.sin(rho) * Math.cos(la0), Math.cos(rho) - Math.sin(la0) * Math.sin(la1));
-      fp.push({ lat: la1 * DEG, lon: mod(lo1 * DEG + 180, 360) - 180 });
-    }
-    g.strokeStyle = cv('--map-track'); g.globalAlpha = .3; g.lineWidth = 1; poly(g, fp, X, Y, w); g.globalAlpha = 1;
-  }
-  var sub = { lat: sc.dec, lon: mod(sc.ra - sc.gmst + 180, 360) - 180 };
-  g.fillStyle = cv('--map-sun'); g.beginPath(); g.arc(X(sub.lon), Y(sub.lat), 4.5, 0, 7); g.fill(); g.fillText('Sun', X(sub.lon) + 7, Y(sub.lat) + 3);
-  if (S.loc) {
-    g.strokeStyle = cv('--map-you'); g.lineWidth = 2; g.beginPath(); g.arc(X(S.loc.lon), Y(S.loc.lat), 5, 0, 7); g.stroke();
-    g.fillStyle = cv('--map-you'); g.fillText('You', X(S.loc.lon) + 8, Y(S.loc.lat) + 3);
-  }
-  if (S.iss) {
-    g.fillStyle = cv('--map-track'); g.strokeStyle = '#fff'; g.lineWidth = 2;
-    g.beginPath(); g.arc(X(S.iss.lon), Y(S.iss.lat), 5, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = cv('--map-track'); g.fillText('ISS', X(S.iss.lon) + 8, Y(S.iss.lat) - 6);
-  }
-}
-addEventListener('resize', drawMap);
 
 /* ---------- weather & air ---------- */
 var WMO = { 0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Rime fog',51:'Light drizzle',
@@ -747,8 +777,6 @@ var WMO = { 0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fo
   65:'Heavy rain',66:'Freezing rain',67:'Heavy freezing rain',71:'Light snow',73:'Snow',75:'Heavy snow',
   77:'Snow grains',80:'Light showers',81:'Showers',82:'Violent showers',85:'Snow showers',86:'Heavy snow showers',
   95:'Thunderstorm',96:'Thunderstorm with hail',99:'Severe thunderstorm with hail' };
-var cf = function (c) { return nf(c, 1) + ' °C / ' + nf(C2F(c), 1) + ' °F'; };
-var spd = function (k) { return nf(k, 1) + ' km/h / ' + nf(k * 0.621371, 1) + ' mph'; };
 var hm = function (sec) { return Math.floor(sec / 3600) + ' h ' + pad((sec % 3600) / 60) + ' m'; };
 async function fnWx() {
   var L = S.loc;
@@ -756,29 +784,34 @@ async function fnWx() {
     '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m' +
     '&hourly=uv_index,visibility,dew_point_2m&daily=sunrise,sunset,uv_index_max,temperature_2m_max,temperature_2m_min,daylight_duration,sunshine_duration' +
     '&timezone=auto&forecast_days=1';
-  var j = await fx(u), c = j.current, hr = parseInt(c.time.slice(11, 13), 10), h = j.hourly, d = j.daily;
+  S.raw.wx = await fx(u);
+  rWx();
+}
+function rWx() {
+  var j = S.raw.wx; if (!j) return;
+  var c = j.current, hr = parseInt(c.time.slice(11, 13), 10), h = j.hourly, d = j.daily;
   live('w_cond', (WMO[c.weather_code] || 'Code ' + c.weather_code) + (c.is_day ? '' : ' (night)'));
-  live('w_temp', cf(c.temperature_2m));
-  live('w_feels', cf(c.apparent_temperature));
-  live('w_dew', cf(h.dew_point_2m[hr]));
+  live('w_temp', fT(c.temperature_2m));
+  live('w_feels', fT(c.apparent_temperature));
+  live('w_dew', fT(h.dew_point_2m[hr]));
   live('w_hum', nf(c.relative_humidity_2m, 0) + ' %');
-  live('w_pres', nf(c.pressure_msl, 1) + ' hPa / ' + nf(c.pressure_msl * 0.02953, 2) + ' inHg');
-  live('w_pressfc', nf(c.surface_pressure, 1) + ' hPa');
-  live('w_wind', spd(c.wind_speed_10m));
+  live('w_pres', fP(c.pressure_msl));
+  live('w_pressfc', fP(c.surface_pressure));
+  live('w_wind', fSp(c.wind_speed_10m, 1));
   live('w_dir', nf(c.wind_direction_10m, 0) + '° ' + compass(c.wind_direction_10m));
-  live('w_gust', spd(c.wind_gusts_10m));
+  live('w_gust', fSp(c.wind_gusts_10m, 1));
   live('w_cloud', nf(c.cloud_cover, 0) + ' %');
-  live('w_precip', nf(c.precipitation, 1) + ' mm');
-  live('w_vis', h.visibility[hr] != null ? nf(h.visibility[hr] / 1000, 1) + ' km' : '—');
+  live('w_precip', fR(c.precipitation));
+  live('w_vis', h.visibility[hr] != null ? fV(h.visibility[hr]) : '—');
   live('w_uv', h.uv_index[hr] != null ? nf(h.uv_index[hr], 1) : '—');
   live('w_uvmax', nf(d.uv_index_max[0], 1));
-  live('w_hi', cf(d.temperature_2m_max[0]));
-  live('w_lo', cf(d.temperature_2m_min[0]));
+  live('w_hi', fT(d.temperature_2m_max[0]));
+  live('w_lo', fT(d.temperature_2m_min[0]));
   live('w_rise', d.sunrise[0].slice(11));
   live('w_set', d.sunset[0].slice(11));
   live('w_daylen', hm(d.daylight_duration[0]));
   live('w_sun', hm(d.sunshine_duration[0]));
-  if (j.elevation != null) set('l_elev', nf(j.elevation, 0) + ' m / ' + nf(j.elevation * 3.28084, 0) + ' ft');
+  if (j.elevation != null) set('l_elev', fH(j.elevation));
 }
 var aqiUS = function (v) { return v == null ? '—' : v + ' · ' + (v <= 50 ? 'Good' : v <= 100 ? 'Moderate' : v <= 150 ? 'Unhealthy for sensitive groups' : v <= 200 ? 'Unhealthy' : v <= 300 ? 'Very unhealthy' : 'Hazardous'); };
 var aqiEU = function (v) { return v == null ? '—' : v + ' · ' + (v <= 20 ? 'Good' : v <= 40 ? 'Fair' : v <= 60 ? 'Moderate' : v <= 80 ? 'Poor' : v <= 100 ? 'Very poor' : 'Extremely poor'); };
@@ -866,13 +899,20 @@ async function fnEq() {
     if (S.loc) {
       var best = null, bd = 1e9;
       f.forEach(function (q) { var dd = hav(S.loc.lat, S.loc.lon, q.geometry.coordinates[1], q.geometry.coordinates[0]); if (dd < bd) { bd = dd; best = q; } });
-      if (best) live('q_closest', nf(bd, 0) + ' km · M' + nf(best.properties.mag, 1));
+      if (best) { S.qbest = { d: bd, m: best.properties.mag }; rEq(); }
     } else set('q_closest', 'Waiting for location');
   }
   try {
     var s = await fx('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson');
     live('q_sig', nf(s.features.length));
   } catch (e) { /* optional */ }
+}
+
+function rEq() { if (S.qbest) live('q_closest', fD(S.qbest.d, 0) + ' · M' + nf(S.qbest.m, 1)); }
+function rAir() {
+  var A = S.airx; if (!A) return;
+  live('p_hi', A.hi ? fH(A.hi.v) + ' · ' + A.hi.cs : '—');
+  live('p_fast', A.fa ? fSp(A.fa.v * 3.6, 0) + ' · ' + A.fa.cs : '—');
 }
 
 /* ---------- markets & networks ---------- */
@@ -927,17 +967,119 @@ async function fnAir() {
   live('p_total', nf(st.length)); live('p_air', nf(air.length)); live('p_gnd', nf(st.length - air.length));
   var hi = air.filter(function (s) { return s[7] != null; }).sort(function (a, b) { return b[7] - a[7]; })[0];
   var fa = air.filter(function (s) { return s[9] != null; }).sort(function (a, b) { return b[9] - a[9]; })[0];
-  live('p_hi', hi ? nf(hi[7] * 3.28084, 0) + ' ft · ' + ((hi[1] || '').trim() || hi[0]) : '—');
-  live('p_fast', fa ? nf(fa[9] * 2.23694, 0) + ' mph · ' + ((fa[1] || '').trim() || fa[0]) : '—');
+  S.airx = { hi: hi ? { v: hi[7], cs: (hi[1] || '').trim() || hi[0] } : null, fa: fa ? { v: fa[9], cs: (fa[1] || '').trim() || fa[0] } : null };
+  rAir();
   var cnt = {}; st.forEach(function (s) { cnt[s[2]] = (cnt[s[2]] || 0) + 1; });
   var top = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0];
   live('p_origin', top ? top + ' (' + cnt[top] + ')' : '—');
 }
 
+/* ---------- sports (ESPN public scoreboards) ---------- */
+var tmF = function (d) { return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
+var wdF = function (d) { return d.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }); };
+function setEvery(name, ms) { JOBS.forEach(function (j) { if (j.name === name) j.every = ms; }); }
+function gameInfo(e) {
+  var c = (e.competitions && e.competitions[0]) || {}, cs = c.competitors || [];
+  var home = cs.find(function (x) { return x.homeAway === 'home'; }) || cs[1] || {};
+  var away = cs.find(function (x) { return x.homeAway === 'away'; }) || cs[0] || {};
+  var st = (e.status && e.status.type) || {};
+  var ab = function (t) { return (t.team && (t.team.abbreviation || t.team.shortDisplayName)) || '?'; };
+  return { id: e.id, state: st.state || 'pre', date: new Date(e.date), away: ab(away), home: ab(home),
+           as: parseInt(away.score, 10), hs: parseInt(home.score, 10),
+           detail: st.shortDetail || st.detail || '', series: (c.series && c.series.summary) || '' };
+}
+function summarize(px, g, fmtNext) {
+  var liveN = g.filter(function (x) { return x.state === 'in'; }).length;
+  var fin = g.filter(function (x) { return x.state === 'post'; }).length;
+  var pts = g.reduce(function (s2, x) { return x.state === 'pre' ? s2 : s2 + (x.as || 0) + (x.hs || 0); }, 0);
+  var nxt = g.filter(function (x) { return x.state === 'pre'; }).sort(function (a, b) { return a.date - b.date; })[0];
+  live(px + '_games', nf(g.length)); live(px + '_live', nf(liveN)); live(px + '_final', nf(fin));
+  live(px + (px === 'mb' ? '_runs' : '_pts'), nf(pts));
+  live(px + '_next', nxt ? fmtNext(nxt.date) + ' · ' + nxt.away + ' @ ' + nxt.home : 'None left');
+  return liveN;
+}
+function renderGames(pid, g, fmtPre) {
+  var box = GAMES[pid]; if (!box) return;
+  var order = { 'in': 0, pre: 1, post: 2 };
+  g.sort(function (a, b) { return ((order[a.state] || 1) - (order[b.state] || 1)) || (a.date - b.date); });
+  if (!box._rows) box._rows = {};
+  var rows = box._rows, seen = {};
+  if (!g.length) { box.textContent = ''; box._rows = {}; rows = box._rows; g = [{ id: 'none', empty: true }]; }
+  else if (rows.none) { box.removeChild(rows.none.row); delete rows.none; }
+  g.forEach(function (x) {
+    var r = rows[x.id], isNew = !r;
+    if (isNew) {
+      r = { row: document.createElement('div'), k: document.createElement('span'), v: document.createElement('span') };
+      r.row.className = 'row'; r.k.className = 'k'; r.v.className = 'v';
+      r.row.appendChild(r.k); r.row.appendChild(r.v); rows[x.id] = r;
+    }
+    seen[x.id] = 1;
+    var label, sub = '', val, isLive = x.state === 'in';
+    if (x.empty) { label = 'No games scheduled'; val = ''; }
+    else {
+      label = x.away + ' @ ' + x.home; sub = x.series;
+      var score = isFinite(x.as) && isFinite(x.hs) ? x.as + '–' + x.hs : '';
+      val = x.state === 'pre' ? fmtPre(x.date) : (score ? score + ' · ' : '') + x.detail;
+    }
+    var key = label + '|' + sub + '|' + val + '|' + isLive;
+    if (r.key !== key) {
+      r.k.textContent = label;
+      if (sub) { var sm = document.createElement('small'); sm.textContent = sub; r.k.appendChild(sm); }
+      r.v.textContent = '';
+      if (isLive) { var dt = document.createElement('span'); dt.className = 'livedot'; r.v.appendChild(dt); }
+      r.v.appendChild(document.createTextNode(val));
+      if (!isNew && r.key && r.key.split('|')[2] !== val) { r.v.classList.remove('f'); void r.v.offsetWidth; r.v.classList.add('f'); }
+      r.key = key;
+    }
+    box.appendChild(r.row);
+  });
+  Object.keys(rows).forEach(function (id) { if (!seen[id]) { if (rows[id].row.parentNode) box.removeChild(rows[id].row); delete rows[id]; } });
+}
+var STYPE = { 1: 'Preseason', 2: 'Regular season', 3: 'Postseason', 4: 'Offseason' };
+function seasonName(j) {
+  var lg = j.leagues && j.leagues[0];
+  return (lg && lg.season && lg.season.type && lg.season.type.name) || (j.season && STYPE[j.season.type]) || '—';
+}
+async function fnMLB() {
+  var j = await fx('https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard');
+  var g = (j.events || []).map(gameInfo), today = new Date().toDateString();
+  live('mb_stage', seasonName(j) + (j.season && j.season.year ? ' ' + j.season.year : ''));
+  var fmt = function (d) { return d.toDateString() === today ? tmF(d) : wdF(d); };
+  var n = summarize('mb', g, fmt);
+  renderGames('mlb', g, fmt);
+  setEvery('mlb', n ? 60000 : 600000);
+}
+async function fnNFL() {
+  var j = await fx('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
+  var g = (j.events || []).map(gameInfo);
+  live('nf_week', (j.week && j.week.number ? 'Week ' + j.week.number + ' · ' : '') + seasonName(j));
+  var n = summarize('nf', g, wdF);
+  renderGames('nfl', g, wdF);
+  setEvery('nfl', n ? 60000 : 600000);
+}
+
+/* ---------- sports history (fixed values, mid-2026) ---------- */
+function initHistory() {
+  var H = {
+    mh_ws: 'New York Yankees · 27', mh_champ: 'Los Angeles Dodgers (2025)', mh_played: '121 (none in 1904 or 1994)',
+    mh_hr: 'Barry Bonds · 762', mh_hrs: 'Barry Bonds · 73 (2001)', mh_hits: 'Pete Rose · 4,256', mh_rbi: 'Hank Aaron · 2,297',
+    mh_sb: 'Rickey Henderson · 1,406', mh_streak: 'Joe DiMaggio · 56 games (1941)', mh_iron: 'Cal Ripken Jr. · 2,632',
+    mh_400: 'Ted Williams · .406 (1941)', mh_w: 'Cy Young · 511', mh_k: 'Nolan Ryan · 5,714', mh_sv: 'Mariano Rivera · 652',
+    mh_team: '116 · 1906 Cubs, 2001 Mariners', mh_5050: 'Shohei Ohtani · 54 HR, 59 SB (2024)',
+    nh_sb: 'Patriots, Steelers · 6 each', nh_champ: 'Seattle Seahawks (Super Bowl LX)', nh_played: '60',
+    nh_pyd: 'Tom Brady · 89,214', nh_ptd: 'Tom Brady · 649', nh_ryd: 'Emmitt Smith · 18,355', nh_wyd: 'Jerry Rice · 22,895',
+    nh_td: 'Jerry Rice · 208', nh_spyd: 'Peyton Manning · 5,477 (2013)', nh_sptd: 'Peyton Manning · 55 (2013)',
+    nh_sryd: 'Eric Dickerson · 2,105 (1984)', nh_sack: '22.5 · Strahan (2001), T.J. Watt (2021)', nh_rings: 'Tom Brady · 7',
+    nh_perfect: '1972 Dolphins · 17–0', nh_score: 'Washington 72, Giants 41 (1966)'
+  };
+  Object.keys(H).forEach(function (k) { set(k, H[k]); });
+  PANEL.mlbh.textContent = 'All-time · as of 2026';
+  PANEL.nflh.textContent = 'All-time · as of 2026';
+}
+
 /* ---------- register feeds & start ---------- */
 job('ip',     'loc',     1800000, fnIP);
 job('iss',    'iss',     10000,   fnISS);
-job('track',  'map',     1200000, fnTrack);
 job('wx',     'wx',      600000,  fnWx, true);
 job('aq',     'aq',      900000,  fnAq, true);
 job('co2',    'climate', 3600000, fnCo2);
@@ -948,17 +1090,35 @@ job('btc',    'mk',      90000,   fnBtc);
 job('fx',     'mk',      3600000, fnFx);
 job('ppl',    'hum',     3600000, fnPpl);
 job('air',    'air',     300000,  fnAir, true);
+job('mlb',    'mlb',     60000,   fnMLB);
+job('nfl',    'nfl',     60000,   fnNFL);
 
 function safe(fn) { return function () { try { fn(); } catch (e) { if (window.console) console.error(e); } }; }
 var tickFast = safe(fast), tickSlow = safe(slow);
-tickFast(); tickSlow(); hdr(); drawMap();
+function segUI() {
+  document.getElementById('u-imp').classList.toggle('on', IMP);
+  document.getElementById('u-met').classList.toggle('on', !IMP);
+  document.getElementById('u-imp').setAttribute('aria-pressed', IMP ? 'true' : 'false');
+  document.getElementById('u-met').setAttribute('aria-pressed', IMP ? 'false' : 'true');
+}
+function setUnits(imp) {
+  if (imp === IMP) return;
+  IMP = imp;
+  try { localStorage.setItem('lm_units', imp ? 'imp' : 'met'); } catch (e) {}
+  segUI(); rWx(); rIss(); rEq(); rAir(); locRows(); relISS(); tickFast(); tickSlow();
+}
+document.getElementById('u-imp').onclick = function () { setUnits(true); };
+document.getElementById('u-met').onclick = function () { setUnits(false); };
+document.getElementById('allbtn').onclick = function () {
+  CLOSED = CLOSED.length >= SCHEMA.length ? [] : SCHEMA.map(function (p) { return p.id; });
+  saveJSON('lm_closed', CLOSED); applyClosed();
+};
+segUI(); applyClosed(); initHistory();
+tickFast(); tickSlow(); hdr();
 setInterval(function () { if (!document.hidden) tickFast(); }, 250);
 setInterval(function () { if (!document.hidden) tickSlow(); }, 1000);
-setInterval(function () { if (!document.hidden) drawMap(); }, 30000);
-var mq = matchMedia('(prefers-color-scheme: dark)');
-if (mq.addEventListener) mq.addEventListener('change', drawMap); else if (mq.addListener) mq.addListener(drawMap);
 setInterval(schedule, 1000);
-document.addEventListener('visibilitychange', function () { if (!document.hidden) { tickFast(); tickSlow(); drawMap(); schedule(); } });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) { tickFast(); tickSlow(); schedule(); } });
 schedule();
 })();
 </script>
