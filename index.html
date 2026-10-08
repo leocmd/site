@@ -137,7 +137,7 @@
 <main><div id="grid"></div></main>
 
 <footer>
-  Feeds: ESPN (MLB and NFL scoreboards), wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
+  Feeds: ESPN (MLB and NFL scoreboards, NFL leaders), MLB Stats API (MLB leaders and all-time totals), wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
   OpenSky, ipapi / ipwho.is, ISS crew list on GitHub Pages. Anything marked "est." or "≈" is computed or
   modelled in your browser (sun, moon, sidereal time, population, Voyager 1, CO₂ fallback). If a feed
   is blocked or rate-limited, its panel says offline and retries on its own. Historical sports records are fixed values from mid-2026 and don't update themselves.
@@ -271,9 +271,17 @@ var SCHEMA = [
   ['mb_stage','Season'],['mb_games','Games today'],['mb_live','Live now'],['mb_final','Final'],
   ['mb_runs','Runs scored today'],['mb_next','Next first pitch']
 ]},
+{ id: 'mlbl', title: 'MLB stat leaders', games: true, rows: [['ml_type','Showing']] },
 { id: 'nfl', title: 'NFL', games: true, rows: [
   ['nf_week','Week'],['nf_games','Games this week'],['nf_live','Live now'],['nf_final','Final'],
   ['nf_pts','Points scored this week'],['nf_next','Next kickoff']
+]},
+{ id: 'nfll', title: 'NFL stat leaders', games: true, rows: [['nl_type','Showing']] },
+{ id: 'mlba', title: 'MLB all-time totals', rows: [
+  ['ma_seasons','Seasons counted'],['ma_g','Games played'],['ma_r','Runs'],['ma_h','Hits'],['ma_2b','Doubles'],
+  ['ma_3b','Triples'],['ma_hr','Home runs'],['ma_rbi','RBI'],['ma_bb','Walks'],['ma_so','Strikeouts'],
+  ['ma_sb','Stolen bases'],['ma_ab','At-bats'],['ma_avg','All-time batting average'],
+  ['ma_rpg','Runs per game (both teams)'],['ma_hrpg','Home runs per game (both teams)'],['ma_cur','This season']
 ]},
 { id: 'mlbh', title: 'MLB history', rows: [
   ['mh_ws','Most World Series titles'],['mh_champ','Reigning champion'],['mh_played','World Series played'],
@@ -998,15 +1006,11 @@ function summarize(px, g, fmtNext) {
   live(px + '_next', nxt ? fmtNext(nxt.date) + ' · ' + nxt.away + ' @ ' + nxt.home : 'None left');
   return liveN;
 }
-function renderGames(pid, g, fmtPre) {
+function renderList(pid, items) {
   var box = GAMES[pid]; if (!box) return;
-  var order = { 'in': 0, pre: 1, post: 2 };
-  g.sort(function (a, b) { return ((order[a.state] || 1) - (order[b.state] || 1)) || (a.date - b.date); });
   if (!box._rows) box._rows = {};
   var rows = box._rows, seen = {};
-  if (!g.length) { box.textContent = ''; box._rows = {}; rows = box._rows; g = [{ id: 'none', empty: true }]; }
-  else if (rows.none) { box.removeChild(rows.none.row); delete rows.none; }
-  g.forEach(function (x) {
+  items.forEach(function (x) {
     var r = rows[x.id], isNew = !r;
     if (isNew) {
       r = { row: document.createElement('div'), k: document.createElement('span'), v: document.createElement('span') };
@@ -1014,26 +1018,31 @@ function renderGames(pid, g, fmtPre) {
       r.row.appendChild(r.k); r.row.appendChild(r.v); rows[x.id] = r;
     }
     seen[x.id] = 1;
-    var label, sub = '', val, isLive = x.state === 'in';
-    if (x.empty) { label = 'No games scheduled'; val = ''; }
-    else {
-      label = x.away + ' @ ' + x.home; sub = x.series;
-      var score = isFinite(x.as) && isFinite(x.hs) ? x.as + '–' + x.hs : '';
-      val = x.state === 'pre' ? fmtPre(x.date) : (score ? score + ' · ' : '') + x.detail;
-    }
-    var key = label + '|' + sub + '|' + val + '|' + isLive;
+    var key = x.label + '|' + (x.sub || '') + '|' + x.val + '|' + !!x.live;
     if (r.key !== key) {
-      r.k.textContent = label;
-      if (sub) { var sm = document.createElement('small'); sm.textContent = sub; r.k.appendChild(sm); }
+      r.k.textContent = x.label;
+      if (x.sub) { var sm = document.createElement('small'); sm.textContent = x.sub; r.k.appendChild(sm); }
       r.v.textContent = '';
-      if (isLive) { var dt = document.createElement('span'); dt.className = 'livedot'; r.v.appendChild(dt); }
-      r.v.appendChild(document.createTextNode(val));
-      if (!isNew && r.key && r.key.split('|')[2] !== val) { r.v.classList.remove('f'); void r.v.offsetWidth; r.v.classList.add('f'); }
+      if (x.live) { var dt = document.createElement('span'); dt.className = 'livedot'; r.v.appendChild(dt); }
+      r.v.appendChild(document.createTextNode(x.val));
+      if (!isNew && r.key && r.key.split('|')[2] !== x.val) { r.v.classList.remove('f'); void r.v.offsetWidth; r.v.classList.add('f'); }
       r.key = key;
     }
     box.appendChild(r.row);
   });
-  Object.keys(rows).forEach(function (id) { if (!seen[id]) { if (rows[id].row.parentNode) box.removeChild(rows[id].row); delete rows[id]; } });
+  Object.keys(rows).forEach(function (id) {
+    if (!seen[id]) { if (rows[id].row.parentNode) box.removeChild(rows[id].row); delete rows[id]; }
+  });
+}
+function renderGames(pid, g, fmtPre) {
+  var order = { 'in': 0, pre: 1, post: 2 };
+  g.sort(function (a, b) { return ((order[a.state] || 1) - (order[b.state] || 1)) || (a.date - b.date); });
+  var items = g.length ? g.map(function (x) {
+    var score = isFinite(x.as) && isFinite(x.hs) ? x.as + '–' + x.hs : '';
+    return { id: x.id, label: x.away + ' @ ' + x.home, sub: x.series, live: x.state === 'in',
+             val: x.state === 'pre' ? fmtPre(x.date) : (score ? score + ' · ' : '') + x.detail };
+  }) : [{ id: 'none', label: 'No games scheduled', val: '' }];
+  renderList(pid, items);
 }
 var STYPE = { 1: 'Preseason', 2: 'Regular season', 3: 'Postseason', 4: 'Offseason' };
 function seasonName(j) {
@@ -1043,6 +1052,7 @@ function seasonName(j) {
 async function fnMLB() {
   var j = await fx('https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard');
   var g = (j.events || []).map(gameInfo), today = new Date().toDateString();
+  S.mlbSeason = j.season || null;
   live('mb_stage', seasonName(j) + (j.season && j.season.year ? ' ' + j.season.year : ''));
   var fmt = function (d) { return d.toDateString() === today ? tmF(d) : wdF(d); };
   var n = summarize('mb', g, fmt);
@@ -1052,10 +1062,130 @@ async function fnMLB() {
 async function fnNFL() {
   var j = await fx('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
   var g = (j.events || []).map(gameInfo);
+  S.nflSeason = j.season || null;
   live('nf_week', (j.week && j.week.number ? 'Week ' + j.week.number + ' · ' : '') + seasonName(j));
   var n = summarize('nf', g, wdF);
   renderGames('nfl', g, wdF);
   setEvery('nfl', n ? 60000 : 600000);
+}
+
+/* ---------- stat leaders ---------- */
+var MLB_CATS = [
+  ['hitting','homeRuns','Home runs'],['hitting','battingAverage','Batting average'],['hitting','runsBattedIn','RBI'],
+  ['hitting','hits','Hits'],['hitting','stolenBases','Stolen bases'],['hitting','onBasePlusSlugging','OPS'],
+  ['pitching','earnedRunAverage','ERA'],['pitching','strikeouts','Strikeouts (pitching)'],
+  ['pitching','wins','Wins'],['pitching','saves','Saves']
+];
+async function mlbLeaders(y, type) {
+  var base = 'https://statsapi.mlb.com/api/v1/stats/leaders?sportId=1&limit=1&season=' + y + '&gameType=' + type;
+  var R = await Promise.allSettled([
+    fx(base + '&statGroup=hitting&leaderCategories=homeRuns,battingAverage,runsBattedIn,hits,stolenBases,onBasePlusSlugging'),
+    fx(base + '&statGroup=pitching&leaderCategories=earnedRunAverage,strikeouts,wins,saves')]);
+  if (R.every(function (r) { return r.status !== 'fulfilled'; })) throw new Error('statsapi');
+  var found = {};
+  R.forEach(function (r, gi) {
+    if (r.status !== 'fulfilled') return;
+    (r.value.leagueLeaders || []).forEach(function (e) {
+      var l = (e.leaders || [])[0]; if (!l) return;
+      var grp = e.statGroup || (gi === 0 ? 'hitting' : 'pitching');
+      found[grp + ':' + e.leaderCategory] = l;
+    });
+  });
+  return MLB_CATS.map(function (c) {
+    var l = found[c[0] + ':' + c[1]]; if (!l) return null;
+    var t = l.team || {};
+    return { id: c[1] + c[0], label: c[2], sub: t.name || '', val: ((l.person && l.person.fullName) || '?') + ' · ' + l.value };
+  }).filter(Boolean);
+}
+async function fnMlbLead() {
+  var now = new Date(), y = (S.mlbSeason && S.mlbSeason.year) || now.getFullYear();
+  var post = S.mlbSeason ? S.mlbSeason.type === 3 : (now.getMonth() >= 9 && now.getMonth() <= 10);
+  var items = [], label = '';
+  if (post) { items = await mlbLeaders(y, 'P'); label = y + ' postseason'; }
+  if (!items.length) { items = await mlbLeaders(y, 'R'); label = y + ' regular season'; }
+  if (!items.length) throw new Error('no leaders');
+  live('ml_type', label);
+  renderList('mlbl', items);
+}
+async function nflLeaders(y, t) {
+  var j = await fx('https://site.api.espn.com/apis/site/v3/sports/football/nfl/leaders?season=' + y + '&seasontype=' + t);
+  var cats = (j.leaders && j.leaders.categories) || j.categories || [];
+  return cats.slice(0, 10).map(function (c) {
+    var l = (c.leaders || [])[0]; if (!l) return null;
+    var a = l.athlete || {}, tm = (l.team && l.team.abbreviation) || (a.team && a.team.abbreviation) || '';
+    return { id: c.name || c.displayName, label: c.displayName || c.name, sub: '',
+             val: (a.displayName || a.fullName || '?') + (tm ? ' (' + tm + ')' : '') + ' · ' + (l.displayValue != null ? l.displayValue : l.value) };
+  }).filter(Boolean);
+}
+async function fnNflLead() {
+  var now = new Date(), mo = now.getMonth();
+  var y = (S.nflSeason && S.nflSeason.year) || (mo < 3 ? now.getFullYear() - 1 : now.getFullYear());
+  var post = S.nflSeason ? S.nflSeason.type === 3 : mo <= 1;
+  var items = [], label = '';
+  if (post) { items = await nflLeaders(y, 3); label = y + ' playoffs'; }
+  if (!items.length) { items = await nflLeaders(y, 2); label = y + ' regular season'; }
+  if (!items.length) throw new Error('no leaders');
+  live('nl_type', label);
+  renderList('nfll', items);
+}
+
+/* ---------- MLB all-time league totals (summed season by season, cached) ---------- */
+var MA_KEY = 'lm_mlb_alltime_v1';
+var MA_F = [['g','gamesPlayed'],['r','runs'],['h','hits'],['d','doubles'],['t','triples'],['hr','homeRuns'],
+            ['rbi','rbi'],['bb','baseOnBalls'],['so','strikeOuts'],['sb','stolenBases'],['ab','atBats']];
+async function maSeason(y) {
+  var j = await fx('https://statsapi.mlb.com/api/v1/teams/stats?season=' + y + '&sportId=1&sportIds=1&group=hitting&stats=season&gameType=R');
+  var sp = (j.stats && j.stats[0] && j.stats[0].splits) || [];
+  if (!sp.length) {
+    if (y < 1901 || y === new Date().getFullYear()) return 0;
+    throw new Error('empty season');
+  }
+  var o = {};
+  MA_F.forEach(function (f) { o[f[0]] = 0; });
+  sp.forEach(function (x) { var st = x.stat || {}; MA_F.forEach(function (f) { o[f[0]] += +st[f[1]] || 0; }); });
+  o.g = Math.round(o.g / 2);
+  return o;
+}
+function maRender(C) {
+  var T = {}, n = 0, first = null, last = null, cy = new Date().getFullYear();
+  MA_F.forEach(function (f) { T[f[0]] = 0; });
+  Object.keys(C.years).forEach(function (k) {
+    var o = C.years[k], y = +k; if (!o) return;
+    n++; if (first == null || y < first) first = y; if (last == null || y > last) last = y;
+    MA_F.forEach(function (f) { T[f[0]] += o[f[0]] || 0; });
+  });
+  if (!n) return;
+  live('ma_seasons', n + ' (' + first + '–' + last + ')');
+  [['ma_g','g'],['ma_r','r'],['ma_h','h'],['ma_2b','d'],['ma_3b','t'],['ma_hr','hr'],['ma_rbi','rbi'],
+   ['ma_bb','bb'],['ma_so','so'],['ma_sb','sb'],['ma_ab','ab']].forEach(function (p) { live(p[0], nf(T[p[1]])); });
+  live('ma_avg', T.ab ? (T.h / T.ab).toFixed(3).replace(/^0/, '') : '—');
+  live('ma_rpg', T.g ? nf(T.r / T.g, 2) : '—');
+  live('ma_hrpg', T.g ? nf(T.hr / T.g, 2) : '—');
+  var c = C.years[cy];
+  live('ma_cur', c ? cy + ': ' + nf(c.hr) + ' HR · ' + nf(c.h) + ' hits · ' + nf(c.r) + ' runs' : 'No games yet in ' + cy);
+}
+async function fnMlbAll() {
+  var C = loadJSON(MA_KEY, null);
+  if (!C || !C.years) C = { years: {} };
+  maRender(C);
+  var cy = new Date().getFullYear(), todo = [];
+  for (var y = 1876; y <= cy; y++) if (!(y in C.years) || y === cy) todo.push(y);
+  var total = todo.length, done = 0, ok = 0, idx = 0;
+  async function worker() {
+    while (idx < todo.length) {
+      var yr = todo[idx++];
+      try { C.years[yr] = await maSeason(yr); ok++; } catch (e) { /* retry next run */ }
+      done++;
+      if (done % 10 === 0 || done === total) {
+        saveJSON(MA_KEY, C); maRender(C);
+        if (done < total) PANEL.mlba.textContent = 'Loading ' + done + ' of ' + total + ' seasons…';
+      }
+      await sleep(150);
+    }
+  }
+  await Promise.all([worker(), worker(), worker()]);
+  saveJSON(MA_KEY, C); maRender(C);
+  if (total && !ok) throw new Error('statsapi');
 }
 
 /* ---------- sports history (fixed values, mid-2026) ---------- */
@@ -1092,6 +1222,9 @@ job('ppl',    'hum',     3600000, fnPpl);
 job('air',    'air',     300000,  fnAir, true);
 job('mlb',    'mlb',     60000,   fnMLB);
 job('nfl',    'nfl',     60000,   fnNFL);
+job('mlbl',   'mlbl',    1800000, fnMlbLead);
+job('nfll',   'nfll',    1800000, fnNflLead);
+job('mlba',   'mlba',    43200000, fnMlbAll);
 
 function safe(fn) { return function () { try { fn(); } catch (e) { if (window.console) console.error(e); } }; }
 var tickFast = safe(fast), tickSlow = safe(slow);
