@@ -2,64 +2,100 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>Live Metrics</title>
 <style>
   :root {
-    --bg: #0a1020;
-    --panel: #0f1930;
-    --line: #1d2b4b;
-    --k: #7b8fb5;
-    --v: #e9efff;
-    --accent: #5cc8ff;
-    --warn: #ffb86b;
-    --flash: rgba(92, 200, 255, .22);
+    --bg: #f2f2f7; --card: #ffffff; --sep: rgba(60,60,67,.18);
+    --label: #6e6e73; --text: #1d1d1f; --accent: #0071e3;
+    --green: #34c759; --orange: #ff9500;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
+    --hdr: rgba(242,242,247,.75);
+    --map-day: #dde8f6; --map-night: rgba(25,35,70,.22); --map-grid: rgba(60,60,67,.13);
+    --map-text: rgba(60,60,67,.5); --map-track: #0071e3; --map-you: #ff9500; --map-sun: #ffb300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1c1c1e; --sep: rgba(84,84,88,.55);
+      --label: #98989d; --text: #f5f5f7; --accent: #0a84ff;
+      --green: #30d158; --orange: #ff9f0a; --shadow: none; --hdr: rgba(0,0,0,.72);
+      --map-day: #1d2c45; --map-night: rgba(0,0,0,.5); --map-grid: rgba(235,235,245,.11);
+      --map-text: rgba(235,235,245,.45); --map-track: #0a84ff; --map-you: #ff9f0a; --map-sun: #ffd60a;
+    }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--v); }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
   body {
-    font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Times New Roman", monospace;
-    padding: 16px;
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; margin-bottom: 14px; }
-  h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .02em; }
-  #hdr { color: var(--k); }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--hdr);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--sep);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .hin {
+    max-width: 1400px; margin: 0 auto; padding: 14px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap;
+  }
+  h1 { font-size: 28px; line-height: 1.1; font-weight: 700; letter-spacing: -.022em; margin: 0; }
+  #hdr { color: var(--label); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); transition: background .4s; }
+  .dot.on { background: var(--green); }
+  main { max-width: 1400px; margin: 0 auto; padding: 22px 20px; }
   #grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-    gap: 12px;
-    align-items: start;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 26px 20px; align-items: start;
   }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
-  .panel.span2 { grid-column: span 2; }
-  .ph {
-    display: flex; justify-content: space-between; gap: 8px;
-    margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  .sec { animation: rise .5s ease both; }
+  .sec.span2 { grid-column: span 2; }
+  .sh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 0 16px 7px; }
+  .sh b { font-size: 13px; font-weight: 600; color: var(--label); text-transform: uppercase; letter-spacing: .02em; }
+  .sh i { font-style: normal; font-size: 12px; color: var(--label); text-align: right; }
+  .sh i.off { color: var(--orange); }
+  .card { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .row {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+    padding: 10px 16px; position: relative; font-size: 14px;
   }
-  .ph b { color: var(--accent); font-weight: 700; }
-  .ph i { color: var(--k); font-style: normal; font-size: 11px; text-align: right; }
-  .row { display: flex; justify-content: space-between; gap: 12px; padding: 1.5px 0; }
-  .k { color: var(--k); flex: 0 1 auto; }
-  .v {
-    text-align: right; font-variant-numeric: tabular-nums; word-break: break-word;
-    border-radius: 3px; padding: 0 3px; margin: 0 -3px;
+  .row + .row::before {
+    content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px;
+    background: var(--sep); transform: scaleY(.5); transform-origin: top;
   }
-  .v.f { animation: fl 1.2s ease-out; }
-  @keyframes fl { from { background: var(--flash); } to { background: transparent; } }
-  canvas { width: 100%; height: auto; display: block; border-radius: 4px; }
-  footer { margin-top: 16px; color: var(--k); font-size: 11px; max-width: 900px; }
-  @media (max-width: 700px) { .panel.span2 { grid-column: span 1; } body { padding: 10px; } }
-  @media (prefers-reduced-motion: reduce) { .v.f { animation: none; } }
+  .k { color: var(--text); flex: 0 1 auto; }
+  .v { color: var(--label); text-align: right; font-variant-numeric: tabular-nums; word-break: break-word; }
+  .v.f { animation: tint 1.4s ease-out; }
+  @keyframes tint { from { color: var(--accent); } to { color: var(--label); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  canvas { width: 100%; height: auto; display: block; }
+  footer {
+    max-width: 1400px; margin: 0 auto; padding: 4px 36px calc(40px + env(safe-area-inset-bottom, 0px));
+    color: var(--label); font-size: 12px; line-height: 1.5;
+  }
+  @media (max-width: 720px) {
+    .sec.span2 { grid-column: span 1; }
+    main { padding: 16px 12px; }
+    .hin { padding: 12px 16px 10px; }
+    h1 { font-size: 24px; }
+    footer { padding-left: 28px; padding-right: 28px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sec, .v.f { animation: none; } }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Live Metrics</h1>
-  <div id="hdr">starting…</div>
+  <div class="hin">
+    <h1>Live Metrics</h1>
+    <div id="hdr"><span class="dot" id="dot"></span><span id="hdrt">Starting…</span></div>
+  </div>
 </header>
 
-<div id="grid"></div>
+<main><div id="grid"></div></main>
 
 <footer>
   Feeds: wheretheiss.at, Open-Meteo, NOAA (SWPC and GML), USGS, CoinGecko, mempool.space, Frankfurter,
@@ -205,18 +241,20 @@ var VAL = {}, PANEL = {}, METRICS = 0;
   var grid = document.getElementById('grid');
   SCHEMA.forEach(function (p) {
     var s = document.createElement('section');
-    s.className = 'panel' + (p.wide ? ' span2' : '');
-    var h = document.createElement('div'); h.className = 'ph';
+    s.className = 'sec' + (p.wide ? ' span2' : '');
+    s.style.animationDelay = Math.min(SCHEMA.indexOf(p) * 30, 400) + 'ms';
+    var h = document.createElement('div'); h.className = 'sh';
     var b = document.createElement('b'); b.textContent = p.title;
     var i = document.createElement('i'); i.textContent = '';
     h.appendChild(b); h.appendChild(i); s.appendChild(h);
     PANEL[p.id] = i;
-    if (p.map) { var c = document.createElement('canvas'); c.id = 'map'; c.width = 720; c.height = 360; s.appendChild(c); }
+    var card = document.createElement('div'); card.className = 'card'; s.appendChild(card);
+    if (p.map) { var c = document.createElement('canvas'); c.id = 'map'; c.width = 720; c.height = 360; card.appendChild(c); }
     p.rows.forEach(function (r) {
       var row = document.createElement('div'); row.className = 'row';
       var k = document.createElement('span'); k.className = 'k'; k.textContent = r[1];
       var v = document.createElement('span'); v.className = 'v'; v.textContent = '…';
-      row.appendChild(k); row.appendChild(v); s.appendChild(row);
+      row.appendChild(k); row.appendChild(v); card.appendChild(row);
       VAL[r[0]] = v; METRICS++;
     });
     grid.appendChild(s);
@@ -233,17 +271,16 @@ function set(k, v, flash) {
 var live = function (k, v) { set(k, v, true); };
 function stamp(id, ok) {
   var e = PANEL[id]; if (!e) return;
-  e.textContent = ok ? 'updated ' + hms(new Date()) : 'offline · retrying';
-  e.style.color = ok ? '' : 'var(--warn)';
+  e.textContent = ok ? 'Updated ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : 'Offline · retrying';
+  e.className = ok ? '' : 'off';
 }
 function hdr() {
-  var el = document.getElementById('hdr');
-  el.textContent = METRICS + ' metrics · ' + S.ok.size + '/' + JOBS.length + ' feeds live · ' +
-                   S.reqs + ' requests (' + S.fail + ' failed)';
+  document.getElementById('hdrt').textContent = METRICS + ' metrics · ' + S.ok.size + ' of ' + JOBS.length + ' feeds live';
+  document.getElementById('dot').className = 'dot' + (S.ok.size ? ' on' : '');
 }
-['time','earth','moon'].forEach(function (id) { PANEL[id].textContent = 'computed locally'; });
-PANEL.dev.textContent = 'this browser';
-PANEL.hum.textContent = 'estimates + feeds';
+['time','earth','moon'].forEach(function (id) { PANEL[id].textContent = 'Computed locally'; });
+PANEL.dev.textContent = 'This browser';
+PANEL.hum.textContent = 'Estimates + feeds';
 
 /* ---------- networking & job scheduler ---------- */
 async function fx(url, text) {
@@ -336,10 +373,10 @@ var prog = function (a, b, ms) { return (ms - a) / (b - a) * 100; };
 function fast() {
   var now = new Date(), ms = +now, y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
   var off = -now.getTimezoneOffset(), ao = Math.abs(off);
-  set('t_local', hms(now) + '.' + pad(now.getMilliseconds(), 3));
+  set('t_local', now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' }));
   set('t_tz', Intl.DateTimeFormat().resolvedOptions().timeZone + ' (UTC' + (off < 0 ? '−' : '+') + pad(ao / 60) + ':' + pad(ao % 60) + ')');
-  set('t_utc', pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()) + '.' + pad(now.getUTCMilliseconds(), 3));
-  set('t_iso', now.toISOString());
+  set('t_utc', pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds()));
+  set('t_iso', now.toISOString().slice(0, 19) + 'Z');
   set('t_unix', nf(Math.floor(ms / 1000)));
   set('t_unixms', nf(ms));
   var jd = ms / 86400000 + 2440587.5;
@@ -543,11 +580,13 @@ if (navigator.getBattery) {
     ['levelchange','chargingchange','chargingtimechange','dischargingtimechange'].forEach(function (ev) { b.addEventListener(ev, u); });
   }).catch(function () { set('d_bat', 'Unavailable'); set('d_chg', 'Unavailable'); });
 } else { set('d_bat', 'Not supported by this browser'); set('d_chg', 'Not supported by this browser'); }
-(function raf() {
-  var fr = 0, last = performance.now();
-  function loop(t) { fr++; if (t - last >= 1000) { S.fps = fr * 1000 / (t - last); fr = 0; last = t; } requestAnimationFrame(loop); }
+function sampleFps() {
+  if (document.hidden) return;
+  var fr = 0, start = performance.now();
+  function loop(t) { fr++; if (t - start < 1000) requestAnimationFrame(loop); else S.fps = fr * 1000 / (t - start); }
   requestAnimationFrame(loop);
-})();
+}
+sampleFps(); setInterval(sampleFps, 15000);
 
 /* ---------- location ---------- */
 function setLoc(lat, lon, src, extra) {
@@ -649,7 +688,8 @@ function drawMap() {
   if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
   var g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   var X = function (lo) { return (lo + 180) / 360 * w; }, Y = function (la) { return (90 - la) / 180 * h; };
-  g.fillStyle = '#1a3560'; g.fillRect(0, 0, w, h);
+  var cs = getComputedStyle(document.documentElement), cv = function (n) { return cs.getPropertyValue(n).trim(); };
+  g.fillStyle = cv('--map-day'); g.fillRect(0, 0, w, h);
 
   var sc = sunCalc(Date.now()), de = (Math.abs(sc.dec) < 1e-4 ? 1e-4 : sc.dec) * RAD;
   g.beginPath();
@@ -659,23 +699,23 @@ function drawMap() {
     if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
   }
   if (de > 0) { g.lineTo(w, h); g.lineTo(0, h); } else { g.lineTo(w, 0); g.lineTo(0, 0); }
-  g.closePath(); g.fillStyle = 'rgba(4,8,20,.55)'; g.fill();
+  g.closePath(); g.fillStyle = cv('--map-night'); g.fill();
 
-  g.lineWidth = 1; g.font = '10px ui-monospace, monospace'; g.fillStyle = 'rgba(190,205,235,.6)';
+  g.lineWidth = 1; g.font = '500 10px -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif'; g.fillStyle = cv('--map-text');
   for (var lo2 = -180; lo2 <= 180; lo2 += 30) {
-    g.strokeStyle = lo2 === 0 ? 'rgba(190,205,235,.45)' : 'rgba(190,205,235,.17)';
+    g.strokeStyle = cv('--map-grid');
     g.beginPath(); g.moveTo(X(lo2), 0); g.lineTo(X(lo2), h); g.stroke();
     if (lo2 > -180 && lo2 < 180) g.fillText(lo2 + '°', X(lo2) + 2, h - 3);
   }
   for (var la2 = -60; la2 <= 60; la2 += 30) {
-    g.strokeStyle = la2 === 0 ? 'rgba(190,205,235,.45)' : 'rgba(190,205,235,.17)';
+    g.strokeStyle = cv('--map-grid');
     g.beginPath(); g.moveTo(0, Y(la2)); g.lineTo(w, Y(la2)); g.stroke();
     g.fillText(la2 + '°', 3, Y(la2) - 2);
   }
 
   if (S.track.length > 1) {
-    g.strokeStyle = 'rgba(92,200,255,.8)'; g.lineWidth = 1.5; g.setLineDash([4, 4]);
-    poly(g, S.track, X, Y, w); g.setLineDash([]);
+    g.strokeStyle = cv('--map-track'); g.globalAlpha = .7; g.lineWidth = 1.5; g.setLineDash([4, 4]);
+    poly(g, S.track, X, Y, w); g.setLineDash([]); g.globalAlpha = 1;
   }
   if (S.iss) {
     var rho = (S.iss.foot / 2) / 6371, la0 = S.iss.lat * RAD, fp = [];
@@ -685,19 +725,18 @@ function drawMap() {
       var lo1 = S.iss.lon * RAD + Math.atan2(Math.sin(t) * Math.sin(rho) * Math.cos(la0), Math.cos(rho) - Math.sin(la0) * Math.sin(la1));
       fp.push({ lat: la1 * DEG, lon: mod(lo1 * DEG + 180, 360) - 180 });
     }
-    g.strokeStyle = 'rgba(92,200,255,.35)'; g.lineWidth = 1; poly(g, fp, X, Y, w);
+    g.strokeStyle = cv('--map-track'); g.globalAlpha = .3; g.lineWidth = 1; poly(g, fp, X, Y, w); g.globalAlpha = 1;
   }
   var sub = { lat: sc.dec, lon: mod(sc.ra - sc.gmst + 180, 360) - 180 };
-  g.fillStyle = '#ffd166'; g.beginPath(); g.arc(X(sub.lon), Y(sub.lat), 4.5, 0, 7); g.fill();
-  g.fillStyle = '#ffd166'; g.fillText('Sun', X(sub.lon) + 7, Y(sub.lat) + 3);
+  g.fillStyle = cv('--map-sun'); g.beginPath(); g.arc(X(sub.lon), Y(sub.lat), 4.5, 0, 7); g.fill(); g.fillText('Sun', X(sub.lon) + 7, Y(sub.lat) + 3);
   if (S.loc) {
-    g.strokeStyle = '#ffb86b'; g.lineWidth = 2; g.beginPath(); g.arc(X(S.loc.lon), Y(S.loc.lat), 5, 0, 7); g.stroke();
-    g.fillStyle = '#ffb86b'; g.fillText('You', X(S.loc.lon) + 8, Y(S.loc.lat) + 3);
+    g.strokeStyle = cv('--map-you'); g.lineWidth = 2; g.beginPath(); g.arc(X(S.loc.lon), Y(S.loc.lat), 5, 0, 7); g.stroke();
+    g.fillStyle = cv('--map-you'); g.fillText('You', X(S.loc.lon) + 8, Y(S.loc.lat) + 3);
   }
   if (S.iss) {
-    g.fillStyle = '#5cc8ff'; g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+    g.fillStyle = cv('--map-track'); g.strokeStyle = '#fff'; g.lineWidth = 2;
     g.beginPath(); g.arc(X(S.iss.lon), Y(S.iss.lat), 5, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = '#fff'; g.fillText('ISS', X(S.iss.lon) + 8, Y(S.iss.lat) - 6);
+    g.fillStyle = cv('--map-track'); g.fillText('ISS', X(S.iss.lon) + 8, Y(S.iss.lat) - 6);
   }
 }
 addEventListener('resize', drawMap);
@@ -897,7 +936,7 @@ async function fnAir() {
 
 /* ---------- register feeds & start ---------- */
 job('ip',     'loc',     1800000, fnIP);
-job('iss',    'iss',     5000,    fnISS);
+job('iss',    'iss',     10000,   fnISS);
 job('track',  'map',     1200000, fnTrack);
 job('wx',     'wx',      600000,  fnWx, true);
 job('aq',     'aq',      900000,  fnAq, true);
@@ -913,11 +952,13 @@ job('air',    'air',     300000,  fnAir, true);
 function safe(fn) { return function () { try { fn(); } catch (e) { if (window.console) console.error(e); } }; }
 var tickFast = safe(fast), tickSlow = safe(slow);
 tickFast(); tickSlow(); hdr(); drawMap();
-setInterval(tickFast, 100);
-setInterval(tickSlow, 1000);
-setInterval(function () { drawMap(); }, 10000);
+setInterval(function () { if (!document.hidden) tickFast(); }, 250);
+setInterval(function () { if (!document.hidden) tickSlow(); }, 1000);
+setInterval(function () { if (!document.hidden) drawMap(); }, 30000);
+var mq = matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', drawMap); else if (mq.addListener) mq.addListener(drawMap);
 setInterval(schedule, 1000);
-document.addEventListener('visibilitychange', function () { if (!document.hidden) schedule(); });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) { tickFast(); tickSlow(); drawMap(); schedule(); } });
 schedule();
 })();
 </script>
