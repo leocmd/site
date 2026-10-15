@@ -331,6 +331,8 @@ body.calm *,body.calm *::before,body.calm *::after{animation-duration:.01ms !imp
 .povchip{position:absolute;top:84px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--label);z-index:4}
 .povchip kbd{font:600 11px ui-monospace,Menlo,monospace;background:var(--fill);border-radius:6px;padding:2px 6px;margin-left:6px}
 .povchip small{color:var(--label2);font-weight:500}
+.tcard b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}
+.olab{font-size:11px;color:var(--label2);text-align:center;font-weight:600;letter-spacing:.02em}
 </style>
 </head>
 <body>
@@ -384,7 +386,7 @@ body.calm *,body.calm *::before,body.calm *::after{animation-duration:.01ms !imp
     <div class="tlinks"><button id="bNew">New city…</button></div>
     <p class="fshint" id="fsHint"></p>
   </div></div>
-  <div class="overlay" id="menu" hidden><div class="tcard2 glass ia"><h1 id="menuTitle" style="font-size:28px"></h1><p class="sub" id="menuSub"></p><div class="mbtns"><button class="play" id="mResume"></button><button id="mSave"></button><button id="mSettings"></button><button id="mQuit"></button></div></div></div>
+  <div class="overlay" id="menu" hidden><div class="tcard2 glass ia"><h1 id="menuTitle" style="font-size:28px"></h1><p class="sub" id="menuSub"></p><div class="mbtns"><button class="play" id="mResume"></button><button id="mSave"></button><button id="mSettings"></button><button id="mNew"></button><button id="mQuit"></button></div></div></div>
   <div class="overlay" id="resume" hidden><div class="tcard2 glass ia"><h1 style="font-size:28px">Paused</h1><p class="sub">You left fullscreen.</p><button class="play" id="bResumeFs">Resume fullscreen</button><div class="tlinks"><button id="bResumeWin">Keep playing in a window</button></div></div></div>
   <div class="overlay" id="postcard" hidden><div class="pcwrap ia"><img id="pcImg" alt="Postcard of your city"><p class="sub">Right-click or long-press the postcard to save it.</p><div class="tlinks"><button id="bPcClose">Close</button></div></div></div>
 </div>
@@ -412,18 +414,19 @@ const ZONES = {
 const DENS = [0, 1, 2.3, 4.2], DENS_NAME = ['', 'Low', 'Medium', 'High'];
 const POP = [0, 6, 14, 30], JOBC = [0, 4, 9, 18], JOBI = [0, 6, 13, 24], JOBO = [0, 8, 18, 34];
 /* what each milestone unlocks (index into MILESTONES) */
-const UNLOCK = { newsroom: 2, press: 2, townhall: 1, plaza: 0, park: 0, coal: 0, wind: 0, pump: 0, well: 0, school: 1, police: 1, fire: 1, mine: 1, hospital: 2, oil: 2, O: 2, dens2: 2, dens3: 3 };
+const UNLOCK = { newsroom: 2, press: 99, lumber: 0, townhall: 1, plaza: 0, park: 1, coal: 0, wind: 0, pump: 0, well: 0, school: 1, police: 1, fire: 1, mine: 1, hospital: 2, oil: 2, O: 2, dens2: 2, dens3: 3 };
 const UNLOCK_NAME = { school: 'Schools', police: 'Police stations', fire: 'Fire stations', mine: 'Ore mines', hospital: 'Hospitals', oil: 'Oil extractors', O: 'Office zoning', dens2: 'Medium density', dens3: 'High density' };
 /* placeable buildings */
 const SVC = {
   townhall: { name: 'Town hall', w: 2.0, d: 1.8, cost: 0, upkeep: 15, pw: 4, wt: 2, cat: 'svc', icon: 'columns', col: '#AF52DE', unique: true },
   newsroom: { name: 'Newsroom', w: 1.4, d: 1.2, cost: 900, upkeep: 20, pw: 3, wt: 1, cat: 'svc', icon: 'news', col: '#5E5CE6', unique: true, jobsO: 10 },
   press:    { name: 'Printing plant', w: 1.8, d: 1.4, cost: 1200, upkeep: 25, pw: 6, wt: 2, cat: 'svc', icon: 'factory', col: '#5E5CE6', unique: true, jobsI: 14 },
+  lumber:   { name: 'Lumber mill', w: 1.6, d: 1.3, cost: 700, upkeep: 15, pw: 2, wt: 0, cat: 'svc', icon: 'leaf', col: '#8D6E4C', res: 'wood', income: 140, jobs: 8 },
   plaza:    { name: 'Community space', w: 1.6, d: 1.6, cost: 60, upkeep: 4, cat: 'svc', icon: 'people', col: '#30B0C7' },
   school:   { name: 'School', w: 1.8, d: 1.3, cost: 1800, upkeep: 60, radius: 11, field: 'edu', pw: 6, wt: 4, cat: 'svc', icon: 'book', col: '#5856D6' },
   hospital: { name: 'Hospital', w: 1.9, d: 1.6, cost: 2600, upkeep: 90, radius: 13, field: 'health', pw: 10, wt: 8, cat: 'svc', icon: 'cross', col: '#FF3B30' },
-  fire:     { name: 'Fire station', w: 1.4, d: 1.5, cost: 1400, upkeep: 50, radius: 11, field: 'fire', pw: 4, wt: 6, cat: 'svc', icon: 'flame', col: '#FF9500' },
-  police:   { name: 'Police station', w: 1.35, d: 1.3, cost: 1300, upkeep: 50, radius: 11, field: 'police', pw: 4, wt: 2, cat: 'svc', icon: 'shield', col: '#007AFF' },
+  fire:     { name: 'Fire station', w: 1.4, d: 1.5, cost: 1400, upkeep: 50, radius: 19, field: 'fire', pw: 4, wt: 6, cat: 'svc', icon: 'flame', col: '#FF9500' },
+  police:   { name: 'Police station', w: 1.35, d: 1.3, cost: 1300, upkeep: 50, radius: 19, field: 'police', pw: 4, wt: 2, cat: 'svc', icon: 'shield', col: '#007AFF' },
   park:     { name: 'Park', w: 1.7, d: 1.7, cost: 350, upkeep: 8, radius: 6, field: 'park', pw: 0, wt: 0, cat: 'svc', icon: 'leaf', col: '#34C759' },
   coal:     { name: 'Coal power plant', w: 1.7, d: 1.7, cost: 1500, upkeep: 80, power: 500, cat: 'util', icon: 'factory', col: '#8E8E93' },
   wind:     { name: 'Wind turbine', w: 0.7, d: 0.7, cost: 500, upkeep: 12, power: 90, cat: 'util', icon: 'fan', col: '#30B0C7' },
@@ -441,7 +444,7 @@ const DIFF = { easy: { money: 80000, upkeep: 0.75, tax: 1.2 }, normal: { money: 
    ===================================================================== */
 const SETTINGS_KEY = 'tinycity-settings-v4';
 const DEFAULTS = {
-  lang: (navigator.language || 'en').toLowerCase().startsWith('ja') ? 'ja' : 'en', pseudo: false, appearance: 'auto', resScale: 1, fpsMode: 'display', showFps: false, fov: 45, uiScale: 1, pinBars: false,
+  lang: (navigator.language || 'en').toLowerCase().startsWith('ja') ? 'ja' : 'en', pseudo: false, dayNight: true, appearance: 'auto', resScale: 1, fpsMode: 'display', showFps: false, fov: 45, uiScale: 1, pinBars: false,
   quality: 'high', shadows: 'high', water: 'animated', trees: 1, drawDist: 'far', dayNight: true, dayLen: 6,
   pedestrians: true, traffic: 1, difficulty: 'normal', sandbox: false, unlockAll: false, fires: true, autosave: 2,
   edgeScroll: false, camSpeed: 1, invertRotate: false, snapAngles: true, blockSize: 5,
@@ -525,9 +528,9 @@ function genTerrain() {
   const side = world.seed % 4;
   for (let iz = 0; iz < TH; iz++) for (let ix = 0; ix < TW; ix++) {
     const x = ix / TR, z = iz / TR;
-    let h = 1.0 + nz(x * 0.06, z * 0.06, 4) * 0.45;
+    let h = 1.0 + nz(x * 0.06, z * 0.06, 4) * (b === 'valley' ? 0.28 : 0.45);
     const m = nm(x * 0.028 + 3, z * 0.028 + 9, 4);
-    h += Math.max(0, m - (b === 'highlands' ? -0.1 : 0.05)) * (b === 'highlands' ? 10 : b === 'lakes' ? 4 : 7.5);
+    h += Math.max(0, m - (b === 'highlands' ? -0.1 : b === 'valley' ? 0.2 : 0.05)) * (b === 'highlands' ? 10 : b === 'lakes' ? 4 : b === 'valley' ? 5.5 : 7.5);
     if (b === 'valley' || b === 'coast' || b === 'highlands') {
       const d = Math.abs(z - riverZ(x)), w = riverW(x) * (b === 'highlands' ? 0.8 : 1);
       h = Math.min(h, 0.12 + Math.max(0, d - w * 0.55) * (b === 'highlands' ? 0.6 : 0.42));
@@ -573,7 +576,7 @@ function blobs(arr, n, rmin, rmax, s) {
 }
 function genFields() {
   ore.fill(0); oil.fill(0); gw.fill(0); air.fill(0); gnd.fill(0);
-  blobs(ore, 6, 3, 6, 0.95); blobs(oil, 5, 4, 7, 0.95); blobs(gw, 14, 5, 11, 0.75);
+  blobs(ore, 3, 5, 9, 0.95); blobs(oil, 2, 6, 10, 0.95); blobs(gw, 14, 5, 11, 0.75);
   const dist = new Int16Array(FN).fill(-1), q = [];
   for (let i = 0; i < FN; i++) if (isWater((i % W) + 0.5, ((i / W) | 0) + 0.5)) { dist[i] = 0; q.push(i); }
   for (let h = 0; h < q.length; h++) {
@@ -740,6 +743,15 @@ function profile(P, S, n, ya, yb) {
     else base = pa ? ya : pb ? yb : Y[k];
     Y[k] = lerp(base, Y[k], Math.min(wa, wb));
     if (wet[k] && Y[k] < WL + 0.2) Y[k] = WL + 0.2;
+  }
+  // a bridge deck is a straight line from bank to bank: it never sags toward the water
+  for (let k = 0; k <= n; k++) {
+    if (!wet[k]) continue;
+    let i0 = k; while (i0 > 0 && wet[i0]) i0--;
+    let i1 = k; while (i1 < n && wet[i1]) i1++;
+    const y0 = wet[i0] ? Y[i1] : Y[i0], y1 = wet[i1] ? Y[i0] : Y[i1], s0 = S[i0], s1 = S[i1];
+    for (let j = i0; j <= i1; j++) { const u = s1 > s0 ? (S[j] - s0) / (s1 - s0) : 0; Y[j] = Math.max(lerp(y0, y1, u), WL + 0.3); }
+    k = i1;
   }
   return { Y, wet };
 }
@@ -1010,16 +1022,17 @@ function flattenSeg(sg) {
   for (let k = 0; k <= sg.n; k++) {
     if (sg.wet[k]) continue;
     const x = P[2 * k], z = P[2 * k + 1], y = sg.Y[k];
-    const ix0 = Math.max(0, Math.floor((x - 1) * TR)), ix1 = Math.min(TW - 1, Math.ceil((x + 1) * TR));
-    const iz0 = Math.max(0, Math.floor((z - 1) * TR)), iz1 = Math.min(TH - 1, Math.ceil((z + 1) * TR));
+    const ix0 = Math.max(0, Math.floor((x - 1.6) * TR)), ix1 = Math.min(TW - 1, Math.ceil((x + 1.6) * TR));
+    const iz0 = Math.max(0, Math.floor((z - 1.6) * TR)), iz1 = Math.min(TH - 1, Math.ceil((z + 1.6) * TR));
     for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
       const v = iz * TW + ix, d = Math.hypot(ix / TR - x, iz / TR - z);
       if (d < fD[v]) { if (fD[v] === 1e9) touched.push(v); fD[v] = d; fY[v] = y; }
     }
   }
   for (const v of touched) {
-    const d = fD[v], w = d < 0.55 ? 1 : d < 1 ? 1 - smooth01((d - 0.55) / 0.45) : 0;
-    if (w > 0) hm[v] += (fY[v] - hm[v]) * w;
+    // the ground under asphalt and sidewalks sits just below them, with a soft shoulder beyond
+    const d = fD[v], w = d < 0.9 ? 1 : d < 1.6 ? 1 - smooth01((d - 0.9) / 0.7) : 0;
+    if (w > 0) hm[v] += (fY[v] - 0.035 - hm[v]) * w;
     fD[v] = 1e9;
   }
   terrainDirty = true;
@@ -1058,6 +1071,7 @@ function rebuildRoadIndex() {
   nodeArr.forEach((n, i) => nodeIdx.set(n.id, i));
   for (const n of nodeArr) if (n.segs.length >= 3) inters.set(n.id, n.segs.map(sid => { const [dx, dz] = segDirAt(segs.get(sid), n.id); return { id: sid, dx, dz }; }));
   rebuildRoadField();
+  for (const n of nodes.values()) if (n.segs.length === 1 && Math.min(n.x, n.z, W - n.x, H - n.z) < 0.7) n.outside = true;
   roadsDirty = true;
 }
 const segComp = id => { const sg = segs.get(id); return sg ? nodeComp.get(sg.a) : -1; };
@@ -1309,7 +1323,8 @@ function planSvc(type, x, z, freeAng) {
     if (!wet) { res.why = 'Water pumps need water right behind them.'; return res; }
   }
   if (type === 'well' && gw[fcell(res.x, res.z)] < 0.25) { res.why = 'Wells need groundwater. Check the resources view.'; return res; }
-  if (D.res && (D.res === 'ore' ? ore : oil)[fcell(res.x, res.z)] < 0.3) { res.why = `Build it on an ${D.res === 'ore' ? 'ore' : 'oil'} deposit.`; return res; }
+  if (D.res === 'wood') { if (forestAt(res.x, res.z, 4) < 14) { res.why = 'Build it next to a forest.'; return res; } }
+  else if (D.res && (D.res === 'ore' ? ore : oil)[fcell(res.x, res.z)] < 0.3) { res.why = `Build it on an ${D.res === 'ore' ? 'ore' : 'oil'} deposit.`; return res; }
   res.ok = true;
   return res;
 }
@@ -1361,7 +1376,9 @@ const lotPw = l => l.level ? l.level * 1.4 * areaF(l) * Math.pow(densF(l), 0.75)
 const lotWt = l => l.level ? l.level * 2.1 * areaF(l) * Math.pow(densF(l), 0.75) : 0.25;
 function lotPop(l) { return l.type === 'R' ? Math.round(POP[l.level] * areaF(l) * densF(l)) : 0; }
 function lotJobs(l) { const f = areaF(l) * densF(l); return Math.round((l.type === 'C' ? JOBC : l.type === 'I' ? JOBI : l.type === 'O' ? JOBO : POP)[l.level] * (l.type === 'R' ? 0 : f)); }
+function forestAt(x, z, r) { let n = 0; for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const cx = Math.floor(x) + dx, cz = Math.floor(z) + dz; if (cx >= 0 && cz >= 0 && cx < W && cz < H) n += treeCell[cz * W + cx]; } return n; }
 function depositAt(v) {
+  if (SVC[v.type].res === 'wood') return Math.min(1, forestAt(v.x, v.z, 4) / 45);
   const arr = SVC[v.type].res === 'ore' ? ore : oil, cx = Math.floor(v.x), cz = Math.floor(v.z);
   let s = 0;
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < W && z < H) s += arr[z * W + x]; }
@@ -1556,8 +1573,9 @@ function simTick() {
   for (const v of svcs.values()) {
     const Dv = SVC[v.type];
     if (!Dv.res || v.working !== 1) continue;
+    if (Dv.res === 'wood') { if (tickN % 40 === 0) fellTree(v); continue; }
     const arr = Dv.res === 'ore' ? ore : oil, cx = Math.floor(v.x), cz = Math.floor(v.z);
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < W && z < H) arr[z * W + x] = Math.max(0, arr[z * W + x] - 0.0005); }
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < W && z < H) arr[z * W + x] = Math.max(0, arr[z * W + x] - 0.000125); }
     if (depositAt(v) < 0.06) dried = true;
   }
   for (const l of lots.values()) {
@@ -1618,6 +1636,14 @@ function monthEnd() {
 }
 const canAfford = c => sandbox().money || money >= c;
 const spend = c => { if (!sandbox().money) money -= c; uiDirty = true; };
+
+/* a lumber mill thins the forest around it, one tree at a time */
+function fellTree(v) {
+  let best = -1, bd = 4.2;
+  for (let i = 0; i < treeN; i++) { if (!tAlive[i]) continue; const d = Math.hypot(tX[i] - v.x, tZ[i] - v.z); if (d < bd && d > 0.9) { bd = d; best = i; } }
+  if (best < 0) return;
+  tAlive[best] = 0; const c = fcell(tX[best], tZ[best]); if (treeCell[c] > 0) treeCell[c]--; treesDirty = true;
+}
 /* =====================================================================
    AGENTS
    Cars follow the Intelligent Driver Model: they accelerate gently, keep a
@@ -1730,15 +1756,19 @@ function buildCar(l1, l2, kindOverride) {
 }
 /* pedestrians head somewhere they'd want to go: shops, parks, schools, work or a neighbour */
 function buildPed(home) {
-  const cands = [];
-  for (const l of lotsNear(home.cx, home.cz, 9)) if (l !== home && l.level && (l.type === 'C' || l.type === 'O' || (l.type === 'R' && Math.random() < 0.25))) cands.push(l);
-  for (const v of svcs.values()) if ((v.type === 'park' || v.type === 'school') && v.seg && Math.abs(v.x - home.cx) < 10 && Math.abs(v.z - home.cz) < 10) {
+  // people walk to nearby places that make sense for the hour: work and school in the morning,
+  // shops at midday, parks and squares in the evening, a few night owls after dark
+  const ph = dayPhase(), W8 = PHASE_W[ph], cands = [], ws = [];
+  const add = (d, w) => { const dist = Math.hypot(d.cx - home.cx, d.cz - home.cz); if (w > 0 && dist < 10) { cands.push(d); ws.push(w / (1 + dist / 3.5)); } };
+  for (const l of lotsNear(home.cx, home.cz, 10)) if (l !== home && l.level) add(l, l.type === 'C' ? W8.shop : l.type === 'O' || l.type === 'I' ? W8.work : W8.friend * 0.3);
+  for (const v of svcs.values()) if ((v.type === 'park' || v.type === 'plaza' || v.type === 'school') && Math.abs(v.x - home.cx) < 10 && Math.abs(v.z - home.cz) < 10) {
     const r = nearestSeg(v.ax, v.az, 1); if (!r) continue;
-    const d = { seg: r.seg, t: r.t, cx: v.x, cz: v.z }; cands.push(d, d);
+    add({ seg: r.seg, t: r.t, cx: v.x, cz: v.z, type: v.type }, v.type === 'school' ? W8.school : W8.park);
   }
   if (!cands.length) return null;
-  const dest = cands[(Math.random() * cands.length) | 0];
-  const goingHome = Math.random() < 0.4;
+  let tw = 0; for (const w of ws) tw += w; let pick = Math.random() * tw, di = 0; while (di < ws.length - 1 && (pick -= ws[di]) > 0) di++;
+  const dest = cands[di];
+  const goingHome = Math.random() < W8.home;
   const o = goingHome ? tripPath(dest, home, ROAD_HW + WALK * 0.55) : tripPath(home, dest, ROAD_HW + WALK * 0.55);
   if (!o || o.x.length < 2) return null;
   const p = finishPath(o, 0, 0);
@@ -1750,6 +1780,20 @@ function buildPed(home) {
   agentPos(c); keepPrev(c);
   if (typeof attachPersona === 'function') attachPersona(c, home);
   return c;
+}
+const PHASE_W = {
+  night: { shop: 0.6, work: 0.1, friend: 0.6, park: 0.2, school: 0, home: 0.75 },
+  morning: { shop: 0.6, work: 3, friend: 0.2, park: 0.5, school: 2.2, home: 0.12 },
+  midday: { shop: 3, work: 0.8, friend: 0.8, park: 1.5, school: 0.3, home: 0.4 },
+  evening: { shop: 1.8, work: 0.3, friend: 1.2, park: 3, school: 0.2, home: 0.55 },
+};
+function dayPhase() { const t = typeof tod === 'number' ? tod : 0.4; return t < 0.22 || t > 0.9 ? 'night' : t < 0.38 ? 'morning' : t < 0.62 ? 'midday' : 'evening'; }
+function walkFactor() { const p = dayPhase(); return p === 'night' ? 0.25 : p === 'morning' ? 0.85 : p === 'midday' ? 0.9 : 1.2; }
+let honkT = 0;
+function honk(c) {
+  const now = performance.now(); if (now - honkT < 1400 || Math.random() > 0.35) return;
+  const d = Math.hypot(c.x - cur.tx, c.z - cur.tz); if (d > 6 + cur.dist * 0.6) return;
+  honkT = now; sfx('honk', clamp(1 - d / (8 + cur.dist * 0.6), 0.15, 1));
 }
 function agentPos(c) {
   const P = c.P, S = c.S, n = S.length;
@@ -1766,11 +1810,11 @@ function spawnAgents() {
   for (let tries = 0; tries < 3 && cars.length < carTarget; tries++) {
     if (!resList.length || !jobList.length) break;
     const a = resList[(Math.random() * resList.length) | 0], b = jobList[(Math.random() * jobList.length) | 0];
-    const e = Math.random() < 0.14 && typeof entranceSpot === 'function' ? entranceSpot() : null, out = e ? { seg: e.seg, t: e.t } : null;
+    const e = Math.random() < 0.1 && typeof entranceSpot === 'function' ? entranceSpot(true) : null, out = e ? { seg: e.seg, t: e.t } : null;
     const c = out ? (Math.random() < 0.5 ? buildCar(out, Math.random() < 0.5 ? a : b) : buildCar(Math.random() < 0.5 ? a : b, out)) : Math.random() < 0.5 ? buildCar(a, b) : buildCar(b, a);
     if (c) cars.push(c);
   }
-  const pedTarget = Math.min(900, Math.floor(stats.pop / 3));
+  const pedTarget = Math.min(900, Math.floor(stats.pop / 2.6 * walkFactor()));
   if (peds.length > pedTarget) peds.length = pedTarget;
   for (let tries = 0; tries < 4 && peds.length < pedTarget; tries++) {
     if (!resList.length) break;
@@ -1853,6 +1897,7 @@ function stepCars(dt) {
         }
         if (go && toLine < 0.5) { c.granted = true; if (!occ.has(e.k)) occ.set(e.k, []); occ.get(e.k).push({ car: c, arm: e.arm, dx: e.dx, dz: e.dz, straight: e.straight, pts: e.pts }); c.wait = 0; }
         else if (!go) {
+          if (c.v > 0.42 && toLine < 0.9 && !c.honked && (!rules.get(e.k) || !Object.keys(rules.get(e.k)).length)) { c.honked = true; honk(c); }
           c.wait += dt;
           if (c.wait > 9 && !occ.get(e.k)) { c.granted = true; occ.set(e.k, [{ car: c, arm: e.arm, dx: e.dx, dz: e.dz, straight: e.straight, pts: e.pts }]); }
           else { const g2 = Math.max(0, toLine) + IDM.s0 - 0.02; if (g2 < gap) { gap = g2; dv = c.v; } }
@@ -2027,10 +2072,11 @@ const tPos = new Float32Array(TN * 3), tCol = new Float32Array(TN * 3), tNrm = n
 }
 const terrMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const topoU = { value: 0 };
+const topoN = { value: 0 };
 terrMat.onBeforeCompile = sh => {
-  sh.uniforms.uTopo = topoU;
-  patchDecal(sh, '', 'uniform float uTopo;\n',
-    ' if (uTopo > 0.01) { float hh = vWP.y / 0.25; float fw = max(fwidth(hh), 1e-4); float ln = 1.0 - min(abs(fract(hh - 0.5) - 0.5) / fw, 1.0); float mj = 1.0 - min(abs(fract(hh / 4.0 - 0.5) - 0.5) * 4.0 / fw, 1.0); gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.22, 0.2, 0.17), max(ln * 0.45, mj * 0.75) * min(uTopo, 1.0)); }\n');
+  sh.uniforms.uTopo = topoU; sh.uniforms.uTopoN = topoN;
+  patchDecal(sh, '', 'uniform float uTopo; uniform float uTopoN;\n',
+    ' if (uTopo > 0.01) { float hh = vWP.y / 0.25; float fw = max(fwidth(hh), 1e-4); float ln = 1.0 - min(abs(fract(hh - 0.5) - 0.5) / fw, 1.0); float mj = 1.0 - min(abs(fract(hh / 4.0 - 0.5) - 0.5) * 4.0 / fw, 1.0); gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(vec3(0.22, 0.2, 0.17), vec3(0.93, 0.95, 1.0), uTopoN), max(ln * 0.5, mj * 0.8) * min(uTopo, 1.0)); }\n');
 };
 terrMat.extensions = { derivatives: true };
 const terrain = new THREE.Mesh(terrGeo, terrMat);
@@ -2290,7 +2336,14 @@ function terrainColor(i) {
     if (h < WL) return overlay === 'topo' ? lerpC(0x9cc3dd, 0x3d6f9e, (WL - h) * 2.5) : 0xc9d3da;
     switch (overlay) {
       case 'pollution': return ramp(POL_RAMP, polMode ? gnd[c] : air[c]);
-      case 'resources': return ore[c] > 0.12 ? lerpC(NEUTRAL, 0xe0832a, ore[c] * 1.1) : oil[c] > 0.12 ? lerpC(NEUTRAL, 0x5a3a78, oil[c] * 1.1) : lerpC(NEUTRAL, 0x2f9fd6, gw[c]);
+      case 'resources':
+        // while placing a harvester, only the resource it harvests is shown
+        const rf = tool === 'svc' ? resFilter : null;
+        if (rf === 'ore') return lerpC(NEUTRAL, 0xe0832a, Math.min(1, ore[c] * 1.1));
+        if (rf === 'oil') return lerpC(NEUTRAL, 0x5a3a78, Math.min(1, oil[c] * 1.1));
+        if (rf === 'gw') return lerpC(NEUTRAL, 0x2f9fd6, gw[c]);
+        if (rf === 'wood') return lerpC(NEUTRAL, 0x2f7d3a, Math.min(1, treeCell[c] / 7));
+        return ore[c] > 0.12 ? lerpC(NEUTRAL, 0xe0832a, ore[c] * 1.1) : oil[c] > 0.12 ? lerpC(NEUTRAL, 0x5a3a78, oil[c] * 1.1) : lerpC(NEUTRAL, 0x2f9fd6, gw[c]);
       case 'edu': case 'health': case 'fire': case 'police': case 'park': return ramp(COV_RAMP, cov[overlay][c]);
       case 'pop': return lerpC(NEUTRAL, 0x5b97e6, Math.min(1, popDensity[c] / 40));
       case 'topo': return ramp(TOPO_RAMP, h);
@@ -2311,7 +2364,7 @@ function terrainColor(i) {
   if (desireOn) { const dv = desire[c]; col = dv > 0.01 ? lerpC(lerpC(col, 0xffffff, 0.12), ZONES[desireType] ? ZONES[desireType].color : 0xffffff, 0.12 + dv * 0.7) : lerpC(col, 0x8f948d, 0.5); }
   return col;
 }
-let desireOn = false;
+let desireOn = false, resFilter = null;
 const popDensity = new Float32Array(FN);
 function rebuildTerrain(full) {
   if (full) {
@@ -2725,8 +2778,7 @@ function growable(l) {
       pb(MB, 'box', F, 0, by + 0.2, fz + bd / 2 + 0.004, bw * 0.98, 0.035, 0.012, accent);
       if (!overlay) pb(MB, 'box', F, -bw * 0.18, by, fz + bd / 2 + 0.005, 0.24, 0.19, 0.012, 0x5d636a);
       for (const vx of [-0.25, 0.2]) pb(MB, 'cyl', F, bw * vx, by + 0.35, fz - bd * 0.15, 0.07, 0.08, 0.07, 0xc9ced3);
-      const [x, z] = pp(F, bw * 0.38, fz - bd * 0.3); put(MB.cyl, x, by, z, 0.08, 0.55, 0.08, 0, 0x8a8178);
-      if (active) smokeSrc.push(x, by + 0.55, z, 0xe2e2e2);
+      if (h % 10 < 4) { const [x, z] = pp(F, bw * 0.38, fz - bd * 0.3); put(MB.cyl, x, by, z, 0.08, 0.55, 0.08, 0, 0x8a8178); if (active) smokeSrc.push(x, by + 0.55, z, 0xe2e2e2); }
       top = by + 0.55;
     } else if (lv === 2) {
       // factory: sawtooth north-light roof, a silo and a chimney
@@ -2741,9 +2793,9 @@ function growable(l) {
       if (!overlay) pb(MB, 'box', F, bw * 0.2, by, fz + bd / 2 + 0.005, 0.26, 0.22, 0.012, 0x5d636a);
       const [sx, sz] = pp(F, -bw * 0.5 - 0.12, fz - bd * 0.2);
       put(MB.cyl, sx, by, sz, 0.26, 0.62, 0.26, 0, 0xe3e0d8); put(MB.pyr, sx, by + 0.62, sz, 0.24, 0.1, 0.24, 0, 0xcfccc4);
-      const [x, z] = pp(F, bw * 0.35, fz - bd * 0.62); put(MB.cyl, x, by, z, 0.12, 1.05, 0.12, 0, 0x7a7068);
+      if (h % 10 < 6) { const [x, z] = pp(F, bw * 0.35, fz - bd * 0.62); put(MB.cyl, x, by, z, 0.12, 1.05, 0.12, 0, 0x7a7068);
       if (!overlay) put(MB.cyl, x, by + 0.9, z, 0.125, 0.08, 0.125, 0, 0xd9483b);
-      if (active) smokeSrc.push(x, by + 1.05, z, 0xd6d6d6);
+      if (active) smokeSrc.push(x, by + 1.05, z, 0xd6d6d6); }
       top = by + 1.05;
     } else {
       // heavy plant: tall hall, HVAC units, twin silos and a striped stack
@@ -2754,10 +2806,10 @@ function growable(l) {
       pb(MB, 'box', F, 0, by + 0.34, fz + bd3 / 2 + 0.004, bw3 * 0.98, 0.04, 0.012, accent);
       if (!overlay) for (const dx of [-0.3, 0.05]) pb(MB, 'box', F, bw3 * dx, by, fz + bd3 / 2 + 0.005, 0.22, 0.24, 0.012, 0x5d636a);
       for (const sx2 of [-0.12, 0.16]) { const [sx, sz] = pp(F, -bw3 * 0.5 - 0.14, fz + bd3 * sx2); put(MB.cyl, sx, by, sz, 0.24, 0.78, 0.24, 0, 0xe6e3dc); put(MB.pyr, sx, by + 0.78, sz, 0.22, 0.09, 0.22, 0, 0xd2cfc8); }
-      const [x, z] = pp(F, bw3 * 0.38, fz - bd3 * 0.62);
+      if (h % 10 < 8) { const [x, z] = pp(F, bw3 * 0.38, fz - bd3 * 0.62);
       put(MB.cyl, x, by, z, 0.15, 1.45, 0.15, 0, 0xe9e6e1);
       if (!overlay) for (const yy of [1.05, 1.3]) put(MB.cyl, x, by + yy, z, 0.155, 0.08, 0.155, 0, 0xd9483b);
-      if (active) smokeSrc.push(x, by + 1.45, z, 0xcfcfcf);
+      if (active) smokeSrc.push(x, by + 1.45, z, 0xcfcfcf); }
       top = by + 1.45;
     }
   }
@@ -2793,6 +2845,13 @@ function serviceModel(S, v, ghost) {
       pb(S, 'box', F, 0.06, by + 1.53, zc, 0.11, 0.06, 0.008, 0x0a84ff);
       windows(S, F, 0, zc, w * 0.8, bd, by + 0.06, 1, 0.46, 6, true);
       return by + 1.6;
+    }
+    case 'lumber': {
+      pb(S, 'box', F, 0, by, -0.1, w * 0.62, 0.34, d * 0.5, 0xb08a5c);
+      pb(S, 'roof', F, 0, by + 0.34, -0.1, w * 0.66, 0.16, d * 0.54, 0x5d6b52);
+      for (let i = 0; i < 3; i++) put(S.cyl, ...pp(F, -w * 0.25 + i * 0.12, d * 0.28).flatMap((v, j) => j ? [by + 0.06, v] : [v]), 0.1, 0.5, 0.1, F.ang, 0x8d6e4c, Math.PI / 2);
+      for (let i = 0; i < 2; i++) put(S.cyl, ...pp(F, -w * 0.19 + i * 0.12, d * 0.28).flatMap((v, j) => j ? [by + 0.15, v] : [v]), 0.1, 0.5, 0.1, F.ang, 0x9c7a55, Math.PI / 2);
+      return by + 0.6;
     }
     case 'plaza': {
       pb(S, 'box', F, 0, by, 0, w * 0.96, 0.02, d * 0.96, 0xd8d2c4);
@@ -3049,7 +3108,11 @@ function drawDynamic(time, dt) {
     const c = cars[i];
     const x = c.px + (c.x - c.px) * al, z = c.pz + (c.z - c.pz) * al;
     if ((x - cx0) * (x - cx0) + (z - cz0) * (z - cz0) > vr2) continue;
-    let hx = c.phx + (c.hx - c.phx) * al, hz = c.phz + (c.hz - c.phz) * al; const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
+    let hx = c.phx + (c.hx - c.phx) * al, hz = c.phz + (c.hz - c.phz) * al;
+    // turning is eased: the body swings round instead of snapping between path directions
+    if (c.shx === undefined) { c.shx = hx; c.shz = hz; }
+    const tk = Math.min(1, dt * 9); c.shx += (hx - c.shx) * tk; c.shz += (hz - c.shz) * tk; hx = c.shx; hz = c.shz;
+    const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
     const ang = Math.atan2(hx, hz), y = c.py + (c.y - c.py) * al + 0.03, rx = hz, rz = -hx;
     const body = overlay ? 0xf4f5f6 : c.col;
     if (c.kind >= 1) {
@@ -3089,7 +3152,7 @@ function drawDynamic(time, dt) {
     pb(MD, 'cons', F, 0, by, fz, w * 0.96, ht, d * 0.96, 0xd8d2c4);
     for (let q = 0; q < 4; q++) pb(MD, 'cons', F, CORNER_X[q] * w / 2, by, fz + CORNER_Z[q] * d / 2, 0.02, ht + 0.12, 0.02, 0xe6a23c);
     pb(MD, 'cons', F, 0, by + ht + 0.1, fz + d / 2, w, 0.015, 0.015, 0xe6a23c);
-    if (!l.cons) { bldDirty = true; burst(l.cx, by + ht, l.cz, 8, 0xffd60a); popStart('lot', l.id); if (Math.hypot(l.cx - cur.tx, l.cz - cur.tz) < 6 + cur.dist) sfx('build'); }
+    if (!l.cons) { bldDirty = true; burst(l.cx, by + ht, l.cz, 8, 0xffd60a); popStart('lot', l.id); if (Math.hypot(l.cx - cur.tx, l.cz - cur.tz) < 6 + cur.dist) sfx('build', l.level); }
   }
   for (let i = sparks.length - 1; i >= 0; i--) {
     const s = sparks[i]; s.t += dt;
@@ -3308,10 +3371,27 @@ function noiseHit(bus, dur, freq, vol = 0.4, type = 'lowpass', delay = 0) {
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   s.connect(f); f.connect(g); g.connect(bus); s.start(t, Math.random() * 2); s.stop(t + dur + 0.02);
 }
-function sfx(name) {
+/* the town's little sounds walk a ii–V–I–vi progression in C. Each finished building moves the
+   harmony on; bigger buildings get richer voicings (triad → seventh → ninth → thirteenth). */
+const PROG = [{ r: 2, q: [0, 3, 7, 10, 14, 17, 21] }, { r: 7, q: [0, 4, 7, 10, 14, 17, 21] }, { r: 0, q: [0, 4, 7, 11, 14, 18, 21] }, { r: 9, q: [0, 3, 7, 10, 14, 17, 21] }];
+let progI = 0;
+const VOICE = [[0, 1, 2], [0, 1, 2, 3], [1, 3, 4, 2], [1, 3, 4, 6]];
+const jz = (semi, dur, vol, delay = 0, bus = AU.sfx, type = 'sine') => tone(bus, 261.63 * Math.pow(2, semi / 12), dur, type, vol, 1, delay);
+function jazzChord(rich, vol, strum = 0.035, bus) {
+  const ch = PROG[progI % 4], v = VOICE[Math.min(3, rich)];
+  if (rich >= 2) jz(ch.r - 12, 0.9, vol * 0.55, 0, bus, 'triangle');
+  v.forEach((d, i) => jz(ch.r + ch.q[d], 0.7 + rich * 0.15, vol * (1 - i * 0.08), i * strum, bus));
+}
+function sfx(name, arg) {
   if (!AU.ok) return;
   const S = AU.sfx, U = AU.ui;
   switch (name) {
+    case 'build': jazzChord(clamp((arg || 1) - 1 + (Math.random() < 0.3 ? 1 : 0), 0, 3), 0.05); progI++; return;
+    case 'pop': jazzChord(1, 0.06, 0.03); return;
+    case 'zone': { const ch = PROG[progI % 4]; jz(ch.r + ch.q[1], 0.35, 0.06, 0, S); jz(ch.r + ch.q[3], 0.45, 0.05, 0.05, S); return; }
+    case 'road': { const ch = PROG[progI % 4]; jz(ch.r + ch.q[0], 0.25, 0.06, 0, S); jz(ch.r + ch.q[2] + 12, 0.3, 0.04, 0.04, S); return; }
+    case 'place': { const ch = PROG[progI % 4]; jz(ch.r + ch.q[2], 0.3, 0.06, 0, S); return; }
+    case 'honk': { const v = 0.05 * (arg || 1); tone(S, 392, 0.16, 'square', v * 0.5); tone(S, 494, 0.16, 'square', v * 0.4); return; }
     case 'tick': tone(U, 1500, 0.035, 'sine', 0.12); break;
     case 'toggle': tone(U, 900, 0.05, 'sine', 0.12); tone(U, 1350, 0.06, 'sine', 0.1, 0, 0.04); break;
     case 'open': tone(U, 620, 0.09, 'sine', 0.1, 1.4); break;
@@ -3319,7 +3399,6 @@ function sfx(name) {
     case 'place': tone(S, 180, 0.22, 'sine', 0.4, 0.5); noiseHit(S, 0.12, 1200, 0.2); tone(S, 660, 0.12, 'triangle', 0.08, 1, 0.05); break;
     case 'zone': tone(S, 520, 0.12, 'sine', 0.14); tone(S, 780, 0.16, 'sine', 0.12, 1, 0.07); break;
     case 'doze': noiseHit(S, 0.35, 420, 0.5); tone(S, 90, 0.3, 'sawtooth', 0.08, 0.6); break;
-    case 'build': tone(S, 988, 0.18, 'sine', 0.07); tone(S, 1319, 0.28, 'sine', 0.06, 1, 0.08); break;
     case 'error': tone(U, 300, 0.09, 'triangle', 0.12); tone(U, 240, 0.12, 'triangle', 0.12, 1, 0.1); break;
     case 'note': tone(U, 880, 0.14, 'sine', 0.08); tone(U, 1175, 0.22, 'sine', 0.07, 1, 0.09); break;
     case 'terra': noiseHit(S, 0.12, 300, 0.12); break;
@@ -3474,7 +3553,7 @@ const TABS = [
   { id: 'utilities', name: 'Utilities', icon: 'bolt', key: '4' }, { id: 'resources', name: 'Resources', icon: 'pick', key: '5' },
   { id: 'terrain', name: 'Terrain', icon: 'mountain', key: '6' }, { id: 'bulldoze', name: 'Bulldoze', icon: 'trash', key: 'B' },
 ];
-const SVC_TABS = { services: ['townhall', 'plaza', 'park', 'school', 'hospital', 'police', 'fire'], utilities: ['coal', 'wind', 'pump', 'well'], resources: ['mine', 'oil'] };
+const SVC_TABS = { services: ['townhall', 'plaza', 'park', 'school', 'hospital', 'police', 'fire'], utilities: ['coal', 'wind', 'pump', 'well'], resources: ['lumber', 'mine', 'oil'] };
 const SVC_DESC = {
   townhall: 'Free, one per town. The council meets here, and the town elects its mayor.',
   plaza: 'A small square for markets, games and anything residents ask room for.',
@@ -3590,7 +3669,7 @@ function onHudClick(e) {
   if (d.zone) { zoneType = d.zone; tool = toolFor('zones'); renderPalette(); resetDrafts(); desireOn = tool === 'zone'; if (desireOn) computeDesire(zoneType); terrainColorDirty = true; return; }
   if (d.svc) { svcType = d.svc; setTab(tab); return; }
   if (d.terra) { terraMode = d.terra; renderPalette(); return; }
-  if (d.view) { autoView = false; setOverlay(overlay === d.view ? 0 : d.view); $('views').hidden = true; return; }
+  if (d.view) { autoView = false; setOverlay(overlay === d.view ? 0 : d.view); $('views').hidden = true; if (!overlay) viewsFromMenu = false; return; }
   if (d.sec) { setSec = d.sec; $('sheet').innerHTML = settingsHTML(); return; }
   if (d.preset) {
     const arms = inters.get(selJ) || [];
@@ -3880,7 +3959,7 @@ function commitProgress(c) {
   }
   return 0;
 }
-function paperReady() { let nr = false, pr = false; for (const v of svcs.values()) { if (v.type === 'newsroom' && v.powered) nr = true; if (v.type === 'press' && v.powered) pr = true; } return nr && pr; }
+function paperReady() { for (const v of svcs.values()) if (v.type === 'newsroom' && v.powered) return true; return false; }
 /* printing makes a passed commitment binding; deadlines start on publication */
 function publishCommits() {
   const opened = [];
@@ -4048,11 +4127,10 @@ function civNote(kind, x, z) {
 }
 /* ---------- the way in: moving vans and regional traffic ---------- */
 function entranceSpot() {
-  if (civ.entrance && segs.has(civ.entrance.seg)) return civ.entrance;
-  let best = null;
-  for (const n of nodes.values()) if (n.outside && n.segs.length === 1) { best = n; break; }
-  if (!best) { let bd = 1e9; for (const n of nodes.values()) { const d = Math.min(n.x, n.z, W - n.x, H - n.z); if (d < bd && n.segs.length === 1) { bd = d; best = n; } } }
-  if (!best) return null;
+  if (civ.entrance && segs.has(civ.entrance.seg) && (nodes.get(segs.get(civ.entrance.seg).a) || {}).outside + (nodes.get(segs.get(civ.entrance.seg).b) || {}).outside) return civ.entrance;
+  // only a real outside connection is a way in or out of town; a dead end never is
+  let best = null; for (const n of nodes.values()) if (n.outside && n.segs.length === 1) { best = n; break; }
+  if (!best) { civ.entrance = null; return null; }
   const sg = segs.get(best.segs[0]);
   civ.entrance = { seg: sg.id, t: sg.a === best.id ? 0.04 : 0.96, x: best.x, z: best.z };
   return civ.entrance;
@@ -4262,7 +4340,7 @@ function printEdition() {
   const ed = { no, day, items: out.slice(0, 14), wx: weatherFor(day) };
   civ.editions.unshift(ed); if (civ.editions.length > 12) civ.editions.pop();
   // the van takes the paper round town; the edition lands when the round is done
-  const press = [...svcs.values()].find(v => v.type === 'press'), far = resList.length ? resList[(Math.random() * resList.length) | 0] : null;
+  const press = [...svcs.values()].find(v => v.type === 'newsroom'), far = resList.length ? resList[(Math.random() * resList.length) | 0] : null;
   if (press && far) { const r = nearestSeg(press.ax, press.az, 3); if (r) { const v = buildCar({ seg: r.seg, t: r.t }, far, 2); if (v) { v.col = 0x2f6fd1; cars.push(v); } } }
   civ.landing = { no, t: 18 };
 }
@@ -4303,7 +4381,7 @@ function paperHTML() {
 addStrings('en', {
   'paper.name': 'The {town} Courier', 'paper.vol': 'Vol. 1 · No. {no} · {price}', 'paper.edition': 'Edition {no}', 'paper.older': '‹ Earlier', 'paper.newer': 'Later ›',
   'paper.front': 'Front page', 'paper.town': 'Town hall', 'paper.community': 'Community', 'paper.business': 'Business', 'paper.sports': 'Sports',
-  'paper.none': 'No local paper yet', 'paper.noneHint': 'Build a Newsroom and a Printing Plant, and the town will start telling you what it thinks.', 'paper.quiet': 'A quiet week in this section.',
+  'paper.none': 'No local paper yet', 'paper.noneHint': 'Build a Newsroom and the town will start telling you what it thinks.', 'paper.quiet': 'A quiet week in this section.',
   'wx.sun': 'sunny', 'wx.clouds': 'cloudy', 'wx.rain': 'showers', 'wx.snow': 'snow flurries', 'wx.storm': 'thunderstorms',
   'season.fall': 'Fall', 'season.winter': 'Winter', 'season.spring': 'Spring',
   'sport.football': 'football', 'sport.soccer': 'soccer', 'sport.volleyball': 'volleyball', 'sport.fieldhockey': 'field hockey', 'sport.xc': 'cross country', 'sport.basketball': 'basketball', 'sport.hockey': 'ice hockey', 'sport.wrestling': 'wrestling', 'sport.swimming': 'swimming', 'sport.baseball': 'baseball', 'sport.softball': 'softball', 'sport.lacrosse': 'lacrosse', 'sport.track': 'track and field', 'sport.tennis': 'tennis',
@@ -4368,7 +4446,7 @@ addStrings('en', {
 addStrings('ja', {
   'paper.name': '{town}・クーリエ', 'paper.vol': '第1巻 第{no}号 · {price}', 'paper.edition': '第{no}号', 'paper.older': '‹ 前の号', 'paper.newer': '次の号 ›',
   'paper.front': '一面', 'paper.town': '町政', 'paper.community': '地域', 'paper.business': '経済', 'paper.sports': 'スポーツ',
-  'paper.none': 'まだ地元紙がありません', 'paper.noneHint': '新聞社と印刷工場を建てると、町の人々の声が届くようになります。', 'paper.quiet': '今週、この欄は静かでした。',
+  'paper.none': 'まだ地元紙がありません', 'paper.noneHint': '新聞社を建てると、町の人々の声が届くようになります。', 'paper.quiet': '今週、この欄は静かでした。',
   'wx.sun': '晴れ', 'wx.clouds': 'くもり', 'wx.rain': 'にわか雨', 'wx.snow': '小雪', 'wx.storm': '雷雨',
   'season.fall': '秋', 'season.winter': '冬', 'season.spring': '春',
   'sport.football': 'アメフト', 'sport.soccer': 'サッカー', 'sport.volleyball': 'バレーボール', 'sport.fieldhockey': 'フィールドホッケー', 'sport.xc': 'クロスカントリー', 'sport.basketball': 'バスケットボール', 'sport.hockey': 'アイスホッケー', 'sport.wrestling': 'レスリング', 'sport.swimming': '水泳', 'sport.baseball': '野球', 'sport.softball': 'ソフトボール', 'sport.lacrosse': 'ラクロス', 'sport.track': '陸上競技', 'sport.tennis': 'テニス',
@@ -4435,6 +4513,8 @@ addStrings('ja', {
    Everything the player reads in the HUD is built here from T(), so
    switching language re-renders the whole interface instantly.
    ===================================================================== */
+let viewsFromMenu = false;
+const WHY_EXTRA = { 'Build it next to a forest.': 'why.trees' };
 const msName = i => STR.en['ms.' + i] ? T('ms.' + i) : MILESTONES[i][1];
 const WHY = {
   'A road needs two different ends.': 'why.ends', 'Overlaps a road.': 'why.road', 'Overlaps another building.': 'why.building', 'Place it beside a road.': 'why.beside',
@@ -4445,6 +4525,7 @@ const WHY = {
 function whyT(s) {
   if (!s) return '';
   if (WHY[s]) return T(WHY[s]);
+  if (WHY_EXTRA[s]) return T(WHY_EXTRA[s]);
   let m = s.match(/^(.+) is in the way\.$/); if (m) { const k = Object.keys(SVC).find(k => SVC[k].name === m[1]); return T('why.inWay', { what: k ? T('svc.' + k) : m[1] }); }
   m = s.match(/deposit\.$/); if (m) return T(s.includes('ore') ? 'why.ore' : 'why.oil');
   m = s.match(/^Your city already has a (.+)$/); if (m) { const k = Object.keys(SVC).find(k => SVC[k].name.toLowerCase() === m[1]); return T('why.unique', { what: k ? T('svc.' + k) : m[1] }); }
@@ -4459,32 +4540,34 @@ function renderTabbar() {
 function tcard(id, attr, icon, col, name, price, desc, on, lockKey) {
   const locked = lockKey && !unlocked(lockKey);
   const tip = locked ? `${desc} ${T('ui.unlocksAt', { rank: msName(UNLOCK[lockKey]), pop: fmtN(MILESTONES[UNLOCK[lockKey]][0]) })}` : desc;
-  return `<button class="tcard${on ? ' on' : ''}${locked ? ' locked' : ''}" ${attr}="${id}" ${locked ? `data-locked="${lockKey}"` : ''} aria-label="${name}"><span class="tile" style="background:${locked ? 'var(--gray)' : col}">${svg(locked ? 'lock' : icon, 20, 2)}</span><b>${name}</b><span class="price">${locked ? msName(UNLOCK[lockKey]) : price}</span><span class="info" data-tip="${tip.replace(/"/g, '&quot;')}" aria-label="${T('ui.about', { name })}">i</span></button>`;
+  return `<button class="tcard${on ? ' on' : ''}${locked ? ' locked' : ''}" ${attr}="${id}" ${locked ? `data-locked="${lockKey}"` : ''} aria-label="${name}"><span class="tile" style="background:${locked ? 'var(--gray)' : col}">${svg(locked ? 'lock' : icon, 20, 2)}</span><b>${name}</b>${price ? `<span class="price">${price}</span>` : ''}<span class="info" data-tip="${tip.replace(/"/g, '&quot;')}" aria-label="${T('ui.about', { name })}">i</span></button>`;
 }
-const priceT = c => c ? fmtMoney(c) : T('ui.free');
+const priceT = c => c ? fmtMoney(c) : '';
 function renderPalette() {
   const p = $('palette');
   let h = '';
   if (tab === 'roads') {
-    h = `<div class="prow">${segm('roadMode', [['straight', T('road.straight'), 'straight'], ['curve', T('road.curve'), 'curve'], ['grid', T('road.grid'), 'grid']], roadMode)}</div>
+    h = `<div class="prow">${segm('roadMode', [['straight', T('road.straight'), 'straight'], ['curve', T('road.curve'), 'curve'], ['grid', T('road.grid'), 'grid'], ['signs', T('road.signs'), 'junction']], roadMode)}</div>
       <div class="prow"><span class="optrow">${T('road.snap')} ${sw('snapAngles', settings.snapAngles, T('road.snap'))}</span>${roadMode === 'grid' ? `<span class="optrow" style="margin-left:14px">${T('road.block')} ${segm('blockSize', [[4, T('size.s')], [5, T('size.m')], [6, T('size.l')], [8, T('size.xl')]], settings.blockSize, 'small')}</span>` : ''}</div>`;
   } else if (tab === 'zones') {
-    const allowed = zoneType === 'X' || zoneType === 'I' ? null : ZONES[zoneType].dens;
-    const densOpts = allowed && allowed.map(d => [d, T('dens.' + d) + (d > 1 && !unlocked('dens' + d) ? ' 🔒' : '')]);
+    const allowed = zoneType === 'X' || zoneType === 'I' ? null : ZONES[zoneType].dens.filter(d => d === 1 || unlocked('dens' + d));
+    if (allowed && allowed.length && !allowed.includes(zoneDens)) zoneDens = allowed[0];
+    const densOpts = allowed && allowed.length > 1 && allowed.map(d => [d, T('dens.' + d)]);
     h = `<div class="prow"><div class="rci-big" title="${T('ui.demand')}">${demandBars(true)}</div>
-      ${tcard('R', 'data-zone', 'house', 'var(--green)', T('zone.R'), T('ui.free'), T('zoned.R'), zoneType === 'R')}
-      ${tcard('C', 'data-zone', 'bag', 'var(--accent)', T('zone.C'), T('ui.free'), T('zoned.C'), zoneType === 'C')}
-      ${tcard('O', 'data-zone', 'briefcase', 'var(--purple)', T('zone.O'), T('ui.free'), T('zoned.O'), zoneType === 'O', 'O')}
-      ${tcard('I', 'data-zone', 'factory', 'var(--orange)', T('zone.I'), T('ui.free'), T('zoned.I'), zoneType === 'I')}
-      ${tcard('X', 'data-zone', 'eraser', 'var(--gray)', T('zone.X'), T('ui.free'), T('zoned.X'), zoneType === 'X')}
-      ${densOpts ? `<span class="optcol">${segm('zoneDens', densOpts, zoneDens, 'small')}</span>` : ''}</div>`;
+      ${tcard('R', 'data-zone', 'house', 'var(--green)', T('zone.R'), '', T('zoned.R'), zoneType === 'R')}
+      ${tcard('C', 'data-zone', 'bag', 'var(--accent)', T('zone.C'), '', T('zoned.C'), zoneType === 'C')}
+      ${unlocked('O') ? tcard('O', 'data-zone', 'briefcase', 'var(--purple)', T('zone.O'), '', T('zoned.O'), zoneType === 'O') : ''}
+      ${tcard('I', 'data-zone', 'factory', 'var(--orange)', T('zone.I'), '', T('zoned.I'), zoneType === 'I')}
+      ${tcard('X', 'data-zone', 'eraser', 'var(--gray)', T('zone.X'), '', T('zoned.X'), zoneType === 'X')}
+      ${densOpts ? `<span class="optcol"><small class="olab">${T('ui.density')}</small>${segm('zoneDens', densOpts, zoneDens, 'small')}</span>` : ''}</div>`;
   } else if (SVC_TABS[tab]) {
-    h = `<div class="prow">${SVC_TABS[tab].map(k => { const d = SVC[k], built = d.unique && [...svcs.values()].some(v => v.type === k); return tcard(k, 'data-svc', d.icon, d.col, T('svc.' + k), built ? T('ui.built') : priceT(d.cost), T('svcd.' + k) + (d.upkeep ? ' ' + T('ui.upkeep', { n: fmtMoney(d.upkeep * 12.5) }) : ''), svcType === k, k); }).join('')}</div>`;
+    const avail = SVC_TABS[tab].filter(k => unlocked(k));
+    h = avail.length ? `<div class="prow">${avail.map(k => { const d = SVC[k], built = d.unique && [...svcs.values()].some(v => v.type === k); return tcard(k, 'data-svc', d.icon, d.col, T('svc.' + k), built ? T('ui.built') : priceT(d.cost), T('svcd.' + k) + (d.upkeep ? ' ' + T('ui.upkeep', { n: fmtMoney(d.upkeep * 12.5) }) : ''), svcType === k); }).join('')}</div>` : `<div class="hintline">${T('ui.nothingYet')}</div>`;
   } else if (tab === 'terrain') {
-    h = `<div class="prow">${tcard('raise', 'data-terra', 'raise', '#7a9a55', T('terra.raise'), T('ui.free'), T('terrad.raise'), terraMode === 'raise')}
-      ${tcard('lower', 'data-terra', 'lower', '#8a6e4c', T('terra.lower'), T('ui.free'), T('terrad.lower'), terraMode === 'lower')}
-      ${tcard('level', 'data-terra', 'level', '#9a8f6a', T('terra.level'), levelPicked ? Math.round(levelH * 20) + ' m' : T('ui.free'), T('terrad.level'), terraMode === 'level')}
-      ${tcard('smooth', 'data-terra', 'smooth', '#6f9a8a', T('terra.smooth'), T('ui.free'), T('terrad.smooth'), terraMode === 'smooth')}
+    h = `<div class="prow">${tcard('raise', 'data-terra', 'raise', '#7a9a55', T('terra.raise'), '', T('terrad.raise'), terraMode === 'raise')}
+      ${tcard('lower', 'data-terra', 'lower', '#8a6e4c', T('terra.lower'), '', T('terrad.lower'), terraMode === 'lower')}
+      ${tcard('level', 'data-terra', 'level', '#9a8f6a', T('terra.level'), '', T('terrad.level'), terraMode === 'level')}
+      ${tcard('smooth', 'data-terra', 'smooth', '#6f9a8a', T('terra.smooth'), '', T('terrad.smooth'), terraMode === 'smooth')}
       <span class="optcol">${segm('brush', [[0, 'S'], [1, 'M'], [2, 'L']], brushSize, 'small')}${segm('strength', [[0.5, T('terra.gentle')], [1, T('terra.normal')], [2, T('terra.strong')]], terraStrength, 'small')}</span></div>`;
   }
   p.hidden = !h; if (h) p.innerHTML = h;
@@ -4657,8 +4740,8 @@ function updateHUD() {
 function settingsHTML() {
   const secs = [['display', 'display', 'var(--accent)'], ['graphics', 'sparkles', 'var(--purple)'], ['sound', 'speaker', 'var(--red)'], ['controls', 'controller', 'var(--green)']];
   let c = '';
-  if (setSec === 'display') c = `<div class="group">${srow(T('set.lang'), segm('lang', [['en', 'English'], ['ja', '日本語']], settings.lang))}${srow(T('set.appearance'), segm('appearance', [['auto', T('set.auto')], ['light', T('set.light')], ['dark', T('set.dark')]], settings.appearance))}${srow(T('set.uiSize'), segm('uiScale', [[0.9, T('size.s')], [1, T('size.m')], [1.12, T('size.l')]], settings.uiScale))}${srow(T('ui.lockBars'), sw('pinBars', settings.pinBars, T('ui.lockBars')))}${srow(T('set.motion'), sw('reduceMotion', settings.reduceMotion, T('set.motion')))}</div>`;
-  else if (setSec === 'graphics') c = `<div class="group">${srow(T('set.quality'), segm('quality', [['low', T('set.low')], ['medium', T('set.med')], ['high', T('set.high')], ['ultra', T('set.ultra')]], settings.quality))}${srow(T('set.res'), segm('resScale', [[0.5, '50%'], [0.75, '75%'], [1, '100%']], settings.resScale))}${srow(T('set.fps'), segm('fpsMode', [['30', '30'], ['60', '60'], ['display', T('set.match')], ['unlimited', T('set.unlimited')]], settings.fpsMode, 'small'))}${srow(T('set.showFps'), sw('showFps', settings.showFps, T('set.showFps')))}</div>
+  if (setSec === 'display') c = `<div class="group">${srow(T('set.lang'), segm('lang', [['en', 'English'], ['ja', '日本語']], settings.lang))}${srow(T('set.appearance'), segm('appearance', [['auto', T('set.auto')], ['light', T('set.light')], ['dark', T('set.dark')]], settings.appearance))}${srow(T('set.uiSize'), segm('uiScale', [[0.9, T('size.s')], [1, T('size.m')], [1.12, T('size.l')]], settings.uiScale))}${srow(T('ui.lockBars'), sw('pinBars', settings.pinBars, T('ui.lockBars')))}${srow(T('set.motion'), sw('reduceMotion', settings.reduceMotion, T('set.motion')))}${srow(T('set.dayNight'), sw('dayNight', settings.dayNight, T('set.dayNight')))}</div>`;
+  else if (setSec === 'graphics') c = `<div class="group">${srow(T('set.quality'), segm('quality', [['low', T('set.low')], ['medium', T('set.med')], ['high', T('set.high')], ['ultra', T('set.ultra')]], settings.quality))}${srow(T('set.res'), segm('resScale', [[0.5, '50%'], [0.75, '75%'], [1, '100%']], settings.resScale))}${srow(T('set.fps'), segm('fpsMode', [['30', '30'], ['60', '60'], ['display', T('set.match')]], settings.fpsMode, 'small'))}${srow(T('set.showFps'), sw('showFps', settings.showFps, T('set.showFps')))}</div>
     <div class="group">${srow(T('set.shadows'), segm('shadows', [['off', T('set.off')], ['low', T('set.low')], ['high', T('set.high')], ['ultra', T('set.ultra')]], settings.shadows, 'small'))}${srow(T('set.water'), segm('water', [['simple', T('set.simple')], ['animated', T('set.animated')]], settings.water))}${srow(T('set.trees'), segm('trees', [[0.5, T('set.some')], [0.75, T('set.more')], [1, T('set.all')]], settings.trees))}${srow(T('set.draw'), segm('drawDist', [['near', T('set.near')], ['far', T('set.far')], ['max', T('set.max')]], settings.drawDist))}${srow(T('set.fov'), slider('fov', 35, 70, 1, settings.fov, v => v + '°'))}</div>`;
   else if (setSec === 'sound') c = `<div class="group">${srow(T('set.mute'), sw('muted', settings.muted, T('set.mute')))}${srow(T('set.master'), slider('volMaster', 0, 1, 0.05, settings.volMaster, v => Math.round(v * 100) + '%'))}</div>
     <div class="group">${srow(T('set.music'), slider('volMusic', 0, 1, 0.05, settings.volMusic, v => Math.round(v * 100) + '%'))}${srow(T('set.sfx'), slider('volSfx', 0, 1, 0.05, settings.volSfx, v => Math.round(v * 100) + '%'))}${srow(T('set.amb'), slider('volAmb', 0, 1, 0.05, settings.volAmb, v => Math.round(v * 100) + '%'))}${srow(T('set.ui'), slider('volUi', 0, 1, 0.05, settings.volUi, v => Math.round(v * 100) + '%'))}</div>`;
@@ -4707,7 +4790,10 @@ function applyLang() {
 hudEl.addEventListener('click', e => {
   const t = e.target.closest('[data-act],[data-set]'); if (!t) return;
   const d = t.dataset, stop = () => { e.stopImmediatePropagation(); e.preventDefault(); };
-  if (d.act === 'chronicle' || d.act === 'paper') { stop(); if (!civ.editions.length) { flashTip(T('paper.noneHint')); return; } if (rcard === 'paper') closeCard(); else { paperView = 0; civ.readNo = civ.unread; sfx('paper'); openCard('paper'); } return; }
+  if (d.svc) { resFilter = SVC[d.svc].res || (d.svc === 'well' ? 'gw' : null); terrainColorDirty = true; }
+  if (d.act === 'closeLegend' && viewsFromMenu) { stop(); autoView = false; setOverlay(0); renderViews(); $('views').hidden = false; return; }
+  if (d.view) viewsFromMenu = true;
+  if (d.act === 'chronicle' || d.act === 'paper') { stop(); if (!civ.editions.length) { if (rcard === 'paper') closeCard(); else openCard('paper'); return; } if (rcard === 'paper') closeCard(); else { paperView = 0; civ.readNo = civ.unread; sfx('paper'); openCard('paper'); } return; }
   if (d.act === 'paperOlder') { stop(); paperView = Math.min(civ.editions.length - 1, paperView + 1); uiDirty = true; return; }
   if (d.act === 'paperNewer') { stop(); paperView = Math.max(0, paperView - 1); uiDirty = true; return; }
   if (d.act === 'lockBars') { stop(); settings.pinBars = !settings.pinBars; saveSettings(); renderTabbar(); sfx('toggle'); barPeek = 1; return; }
@@ -4726,9 +4812,9 @@ addStrings('en', {
   'dens.1': 'Low', 'dens.2': 'Mid', 'dens.3': 'High',
   'zone.R': 'Homes', 'zone.C': 'Shops', 'zone.O': 'Offices', 'zone.I': 'Industry', 'zone.X': 'Unzone',
   'zoned.R': 'Grows bigger with schools, healthcare and parks.', 'zoned.C': 'Shops and restaurants for residents.', 'zoned.O': 'Clean jobs for educated workers.', 'zoned.I': 'Many jobs, but smoke spreads around it.', 'zoned.X': 'Clears plots and buildings inside the area.',
-  'svc.townhall': 'Town hall', 'svc.newsroom': 'Newsroom', 'svc.press': 'Printing plant', 'svc.plaza': 'Community space', 'svc.park': 'Park', 'svc.school': 'School', 'svc.hospital': 'Hospital', 'svc.police': 'Police station', 'svc.fire': 'Fire station',
+  'svc.townhall': 'Town hall', 'svc.newsroom': 'Newsroom', 'svc.press': 'Printing plant', 'svc.plaza': 'Square', 'svc.park': 'Park', 'svc.school': 'School', 'svc.hospital': 'Hospital', 'svc.police': 'Police', 'svc.fire': 'Fire station',
   'svc.coal': 'Coal plant', 'svc.wind': 'Wind turbine', 'svc.pump': 'Water pump', 'svc.well': 'Well', 'svc.mine': 'Mine', 'svc.oil': 'Oil well',
-  'svcd.townhall': 'Free, one per town. The council meets here and the town elects its mayor.', 'svcd.newsroom': 'Reporters for the weekly paper. Needs the printing plant too.', 'svcd.press': 'Prints the weekly paper. Needs the newsroom too.', 'svcd.plaza': 'A small square for markets, games and anything residents ask room for.', 'svcd.park': 'Happier residents and slightly cleaner air.', 'svcd.school': 'Educated residents can move into bigger homes.', 'svcd.hospital': 'Healthcare lets neighborhoods grow taller.', 'svcd.police': 'Safer streets let shops and factories grow.', 'svcd.fire': 'Puts out fires before buildings burn down.',
+  'svcd.townhall': 'Free, one per town. The council meets here and the town elects its mayor.', 'svcd.newsroom': 'Reporters and a small press that print the weekly paper.', 'svcd.press': 'Prints the weekly paper. Needs the newsroom too.', 'svcd.plaza': 'A small square for markets, games and anything residents ask room for.', 'svcd.park': 'Happier residents and slightly cleaner air.', 'svcd.school': 'Educated residents can move into bigger homes.', 'svcd.hospital': 'Healthcare lets neighborhoods grow taller.', 'svcd.police': 'Safer streets let shops and factories grow.', 'svcd.fire': 'Puts out fires before buildings burn down.',
   'svcd.coal': 'Cheap power, heavy smog.', 'svcd.wind': 'Clean power, a little less of it.', 'svcd.pump': 'Draws water from a river or lake right behind it.', 'svcd.well': 'Pumps groundwater.', 'svcd.mine': 'Digs ore for export.', 'svcd.oil': 'Pumps oil for export.',
   'svc.status': 'Status', 'svc.output': 'Output', 'svc.radius': 'Service radius', 'svc.deposit': 'Deposit left', 'svc.upkeep': 'Upkeep', 'svc.emissions': 'Emissions', 'svc.heavy': 'Heavy', 'svc.noneE': 'None', 'svc.bulldoze': 'Bulldoze',
   'svcst.0': 'Idle', 'svcst.1': 'Working', 'svcst.2': 'Not connected to a road', 'svcst.3': 'No water source', 'svcst.4': 'No water', 'svcst.5': 'No electricity', 'svcst.6': 'Deposit depleted',
@@ -4751,10 +4837,10 @@ addStrings('en', {
   'cit.age': '{n} years old', 'cit.council': 'Council member', 'cit.wfh': 'Works from home', 'cit.retired': 'Retired', 'cit.looking': 'Looking for work', 'cit.mood': 'Mood', 'cit.doing': 'Doing', 'cit.home': 'Home', 'cit.work': 'Work', 'cit.cares': 'Cares most about', 'cit.friends': 'Friends', 'cit.follow': 'Follow with the camera', 'cit.unfollow': 'Stop following',
   'trait.civic': 'Civic-minded', 'trait.eco': 'Eco', 'trait.entre': 'Entrepreneurial', 'trait.home': 'Homebody', 'trait.night': 'Night owl', 'trait.family': 'Family-focused', 'trait.social': 'Social', 'trait.artsy': 'Artsy',
   'ach.follow': 'People person', 'achh.follow': 'Follow a resident around town', 'ach.night': 'Night owl', 'achh.night': 'Watch the town through a whole night', 'ach.election': 'Civic duty', 'achh.election': 'See an election through', 'ach.promise': 'Power to the people', 'achh.promise': 'Deliver what a petition asked for', 'ach.paper': 'Hot off the press', 'achh.paper': 'Print the first edition', 'ach.ufo': 'Did you see that?', 'achh.ufo': 'Click on something strange in the night sky', 'ach.gold': 'Golden find', 'achh.gold': 'Spot one very lucky house', 'ach.photo': 'Say cheese', 'achh.photo': 'Make a postcard', 'ach.tiny': 'Tiny planet', 'achh.tiny': 'Zoom all the way out', 'ach.statue': 'Local hero', 'achh.statue': 'A neighborhood raises a statue',
-  'set.title': 'Settings', 'set.display': 'Display', 'set.graphics': 'Graphics', 'set.sound': 'Sound', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.appearance': 'Appearance', 'set.auto': 'Automatic', 'set.light': 'Light', 'set.dark': 'Dark', 'set.uiSize': 'Interface size', 'set.motion': 'Reduce motion',
+  'set.title': 'Settings', 'set.display': 'Display', 'set.graphics': 'Graphics', 'set.sound': 'Sound', 'set.controls': 'Controls', 'set.lang': 'Language', 'set.appearance': 'Appearance', 'set.auto': 'Automatic', 'set.light': 'Light', 'set.dark': 'Dark', 'set.uiSize': 'Interface size', 'set.motion': 'Reduce motion', 'set.dayNight': 'Day and night cycle', 'road.signs': 'Intersections', 'tip.signsMode': 'Click a marker at an intersection to change who has priority', 'ui.density': 'Density', 'ui.nothingYet': 'More unlocks as your town grows.', 'svc.lumber': 'Lumber mill', 'svcd.lumber': 'Cuts timber from the forest around it and sells it straight away.', 'unlock.lumber': 'Lumber mills', 'why.trees': 'Build it next to a forest.', 'title.back': 'Back',
   'set.quality': 'Quality', 'set.low': 'Low', 'set.med': 'Medium', 'set.high': 'High', 'set.ultra': 'Ultra', 'set.res': 'Resolution', 'set.fps': 'Frame rate', 'set.match': 'Match display', 'set.unlimited': 'Unlimited', 'set.showFps': 'Show frame rate', 'set.shadows': 'Shadows', 'set.off': 'Off', 'set.water': 'Water', 'set.simple': 'Simple', 'set.animated': 'Animated', 'set.trees': 'Trees', 'set.some': 'Some', 'set.more': 'More', 'set.all': 'All', 'set.draw': 'Draw distance', 'set.near': 'Near', 'set.far': 'Far', 'set.max': 'Max', 'set.fov': 'Field of view',
   'set.mute': 'Mute', 'set.master': 'Master volume', 'set.music': 'Music', 'set.sfx': 'Effects', 'set.amb': 'Ambience', 'set.ui': 'Interface', 'set.camSpeed': 'Camera speed', 'set.invert': 'Invert rotation', 'set.edge': 'Scroll at screen edges', 'set.autosave': 'Autosave', 'set.min': '{n} min', 'set.saveNow': 'Save now', 'set.toTitle': 'Back to the title screen (saves first)',
-  'k.pan': 'Pan', 'kv.pan': 'Drag, or WASD', 'k.rot': 'Rotate and tilt', 'kv.rot': 'Right-drag, or Q and E', 'k.zoom': 'Zoom', 'kv.zoom': 'Scroll, or + and −', 'k.tools': 'Tools', 'kv.tools': '1–6, B for bulldoze, Esc to leave', 'k.pause': 'Pause', 'kv.pause': 'Space', 'k.paper': 'Newspaper', 'kv.paper': 'N', 'k.photo': 'Photo mode', 'kv.photo': 'P', 'k.full': 'Fullscreen', 'kv.full': 'F', 'k.topo': 'Contours while building roads', 'kv.topo': 'Hold Shift',
+  'k.pan': 'Pan', 'kv.pan': 'Drag, or WASD', 'k.rot': 'Rotate and tilt', 'kv.rot': 'Right-drag, or Q and E', 'k.zoom': 'Zoom', 'kv.zoom': 'Scroll, or + and −', 'k.tools': 'Tools', 'kv.tools': '1–6, B for bulldoze, Esc to leave', 'k.pause': 'Pause', 'kv.pause': 'Space', 'k.paper': 'Newspaper', 'kv.paper': 'N', 'k.photo': 'Photo mode', 'kv.photo': 'P', 'k.full': 'Fullscreen', 'kv.full': 'F', 'k.topo': 'Contours while building roads or zoning', 'kv.topo': 'Shift turns them on and off',
   'paper.button': 'The weekly paper (N)',
   'biome.valley': 'River valley', 'biome.coast': 'Coastline', 'biome.islands': 'Islands', 'biome.highlands': 'Highlands', 'biome.lakes': 'Lake district',
   'biomed.valley': 'A winding river, a lake and rolling hills.', 'biomed.coast': 'Open sea along one shore and a river mouth.', 'biomed.islands': 'An archipelago. Land is precious; bridges matter.', 'biomed.highlands': 'Steep hills, mountain lakes, narrow valleys.', 'biomed.lakes': 'Gentle land dotted with lakes and ponds.',
@@ -4773,9 +4859,9 @@ addStrings('ja', {
   'dens.1': '低', 'dens.2': '中', 'dens.3': '高',
   'zone.R': '住宅', 'zone.C': '商業', 'zone.O': 'オフィス', 'zone.I': '工業', 'zone.X': '区画解除',
   'zoned.R': '学校・医療・公園が整うと大きく育ちます。', 'zoned.C': '住民のための商店や飲食店。', 'zoned.O': '教育を受けた人のためのクリーンな仕事。', 'zoned.I': '仕事は多いが、煙が周囲に広がります。', 'zoned.X': '範囲内の区画と建物を取り除きます。',
-  'svc.townhall': '町役場', 'svc.newsroom': '新聞社', 'svc.press': '印刷工場', 'svc.plaza': '地域の広場', 'svc.park': '公園', 'svc.school': '学校', 'svc.hospital': '病院', 'svc.police': '警察署', 'svc.fire': '消防署',
+  'svc.townhall': '町役場', 'svc.newsroom': '新聞社', 'svc.press': '印刷工場', 'svc.plaza': '広場', 'svc.park': '公園', 'svc.school': '学校', 'svc.hospital': '病院', 'svc.police': '警察署', 'svc.fire': '消防署',
   'svc.coal': '石炭火力発電所', 'svc.wind': '風力発電機', 'svc.pump': '取水ポンプ', 'svc.well': '井戸', 'svc.mine': '鉱山', 'svc.oil': '油井',
-  'svcd.townhall': '無料・一つの町に一つ。議会が開かれ、町長が選ばれます。', 'svcd.newsroom': '週刊紙の記者たち。印刷工場も必要です。', 'svcd.press': '週刊紙を印刷します。新聞社も必要です。', 'svcd.plaza': 'マルシェや遊び、住民が求める催しのための小さな広場。', 'svcd.park': '住民が幸せになり、空気も少しきれいに。', 'svcd.school': '教育を受けた住民は大きな家に住めます。', 'svcd.hospital': '医療があると街並みが高く育ちます。', 'svcd.police': '安全な通りで商店や工場が育ちます。', 'svcd.fire': '建物が焼け落ちる前に火を消します。',
+  'svcd.townhall': '無料・一つの町に一つ。議会が開かれ、町長が選ばれます。', 'svcd.newsroom': '週刊紙をつくる記者と小さな印刷機。', 'svcd.press': '週刊紙を印刷します。新聞社も必要です。', 'svcd.plaza': 'マルシェや遊び、住民が求める催しのための小さな広場。', 'svcd.park': '住民が幸せになり、空気も少しきれいに。', 'svcd.school': '教育を受けた住民は大きな家に住めます。', 'svcd.hospital': '医療があると街並みが高く育ちます。', 'svcd.police': '安全な通りで商店や工場が育ちます。', 'svcd.fire': '建物が焼け落ちる前に火を消します。',
   'svcd.coal': '安い電力、ひどいスモッグ。', 'svcd.wind': 'クリーンな電力。少し控えめ。', 'svcd.pump': 'すぐ後ろの川や湖から取水します。', 'svcd.well': '地下水をくみ上げます。', 'svcd.mine': '輸出用の鉱石を掘ります。', 'svcd.oil': '輸出用の石油をくみ上げます。',
   'svc.status': '状態', 'svc.output': '出力', 'svc.radius': 'サービス範囲', 'svc.deposit': '残りの埋蔵量', 'svc.upkeep': '維持費', 'svc.emissions': '排出', 'svc.heavy': '多い', 'svc.noneE': 'なし', 'svc.bulldoze': '撤去',
   'svcst.0': '待機中', 'svcst.1': '稼働中', 'svcst.2': '道路につながっていません', 'svcst.3': '水源がありません', 'svcst.4': '水がありません', 'svcst.5': '電気がありません', 'svcst.6': '資源が枯渇しました',
@@ -4798,10 +4884,10 @@ addStrings('ja', {
   'cit.age': '{n}歳', 'cit.council': '議員', 'cit.wfh': '在宅勤務', 'cit.retired': '引退', 'cit.looking': '仕事を探しています', 'cit.mood': '気分', 'cit.doing': 'いまの様子', 'cit.home': '自宅', 'cit.work': '仕事', 'cit.cares': '一番の関心', 'cit.friends': '友人', 'cit.follow': 'カメラで追いかける', 'cit.unfollow': '追いかけるのをやめる',
   'trait.civic': '公共心', 'trait.eco': 'エコ', 'trait.entre': '起業家', 'trait.home': 'インドア派', 'trait.night': '夜型', 'trait.family': '家族思い', 'trait.social': '社交的', 'trait.artsy': 'アート好き',
   'ach.follow': '人づきあい', 'achh.follow': '住民をカメラで追いかける', 'ach.night': '夜ふかし', 'achh.night': '町の夜を最後まで見届ける', 'ach.election': '市民の義務', 'achh.election': '選挙を見届ける', 'ach.promise': '住民の力', 'achh.promise': '請願の内容を実現する', 'ach.paper': '刷り上がり', 'achh.paper': '創刊号を発行する', 'ach.ufo': '今の見た？', 'achh.ufo': '夜空の不思議なものをクリックする', 'ach.gold': '金色の発見', 'achh.gold': 'とても幸運な家を見つける', 'ach.photo': 'はい、チーズ', 'achh.photo': '絵はがきをつくる', 'ach.tiny': '小さな星', 'achh.tiny': '一番遠くまでズームアウトする', 'ach.statue': '地元の英雄', 'achh.statue': '住民が銅像を建てる',
-  'set.title': '設定', 'set.display': '表示', 'set.graphics': 'グラフィック', 'set.sound': 'サウンド', 'set.controls': '操作', 'set.lang': '言語', 'set.appearance': '外観', 'set.auto': '自動', 'set.light': 'ライト', 'set.dark': 'ダーク', 'set.uiSize': 'UIの大きさ', 'set.motion': '動きを減らす',
+  'set.title': '設定', 'set.display': '表示', 'set.graphics': 'グラフィック', 'set.sound': 'サウンド', 'set.controls': '操作', 'set.lang': '言語', 'set.appearance': '外観', 'set.auto': '自動', 'set.light': 'ライト', 'set.dark': 'ダーク', 'set.uiSize': 'UIの大きさ', 'set.motion': '動きを減らす', 'set.dayNight': '昼夜のサイクル', 'road.signs': '交差点', 'tip.signsMode': '交差点のマーカーをクリックして優先を切り替え', 'ui.density': '密度', 'ui.nothingYet': '町が育つと新しい施設が解放されます。', 'svc.lumber': '製材所', 'svcd.lumber': '周りの森から木材を切り出し、すぐに売ります。', 'unlock.lumber': '製材所', 'why.trees': '森のそばに建ててください。', 'title.back': '戻る',
   'set.quality': '品質', 'set.low': '低', 'set.med': '中', 'set.high': '高', 'set.ultra': '最高', 'set.res': '解像度', 'set.fps': 'フレームレート', 'set.match': 'ディスプレイに合わせる', 'set.unlimited': '無制限', 'set.showFps': 'フレームレートを表示', 'set.shadows': '影', 'set.off': 'オフ', 'set.water': '水面', 'set.simple': 'シンプル', 'set.animated': 'アニメーション', 'set.trees': '木', 'set.some': '少なめ', 'set.more': '多め', 'set.all': 'すべて', 'set.draw': '描画距離', 'set.near': '近い', 'set.far': '遠い', 'set.max': '最大', 'set.fov': '視野角',
   'set.mute': 'ミュート', 'set.master': '全体の音量', 'set.music': '音楽', 'set.sfx': '効果音', 'set.amb': '環境音', 'set.ui': 'UI音', 'set.camSpeed': 'カメラの速さ', 'set.invert': '回転を反転', 'set.edge': '画面端でスクロール', 'set.autosave': 'オートセーブ', 'set.min': '{n}分', 'set.saveNow': '今すぐ保存', 'set.toTitle': 'タイトル画面に戻る（先に保存します）',
-  'k.pan': '移動', 'kv.pan': 'ドラッグ または WASD', 'k.rot': '回転・傾き', 'kv.rot': '右ドラッグ または Q・E', 'k.zoom': 'ズーム', 'kv.zoom': 'スクロール または ＋・−', 'k.tools': 'ツール', 'kv.tools': '1〜6、Bで撤去、Escで解除', 'k.pause': '一時停止', 'kv.pause': 'スペース', 'k.paper': '新聞', 'kv.paper': 'N', 'k.photo': '写真モード', 'kv.photo': 'P', 'k.full': 'フルスクリーン', 'kv.full': 'F', 'k.topo': '道路建設中の等高線', 'kv.topo': 'Shiftを押したまま',
+  'k.pan': '移動', 'kv.pan': 'ドラッグ または WASD', 'k.rot': '回転・傾き', 'kv.rot': '右ドラッグ または Q・E', 'k.zoom': 'ズーム', 'kv.zoom': 'スクロール または ＋・−', 'k.tools': 'ツール', 'kv.tools': '1〜6、Bで撤去、Escで解除', 'k.pause': '一時停止', 'kv.pause': 'スペース', 'k.paper': '新聞', 'kv.paper': 'N', 'k.photo': '写真モード', 'kv.photo': 'P', 'k.full': 'フルスクリーン', 'kv.full': 'F', 'k.topo': '道路・区画づくりの等高線', 'kv.topo': 'Shiftで表示を切り替え',
   'paper.button': '週刊紙 (N)',
   'biome.valley': '川の谷', 'biome.coast': '海岸', 'biome.islands': '島々', 'biome.highlands': '高地', 'biome.lakes': '湖水地方',
   'biomed.valley': '曲がりくねる川と湖、なだらかな丘。', 'biomed.coast': '片側に海が広がり、河口がある土地。', 'biomed.islands': '群島。土地は貴重で、橋が大切。', 'biomed.highlands': '険しい丘、山の湖、狭い谷。', 'biomed.lakes': '湖や池が点在する穏やかな土地。',
@@ -4829,7 +4915,7 @@ function openMenu() {
   if (pov) stopPOV();
   hardPause(true);
   $('menuTitle').textContent = cityName; $('menuSub').textContent = `${calDate(day)} · ${T('city.pop', { n: fmtN(stats.pop) })}`;
-  $('mResume').textContent = T('menu.resume'); $('mSave').textContent = T('menu.save'); $('mSettings').textContent = T('set.title'); $('mQuit').textContent = T('menu.quit');
+  $('mResume').textContent = T('menu.resume'); $('mSave').textContent = T('menu.save'); $('mSettings').textContent = T('set.title'); $('mNew').textContent = T('menu.newTown'); $('mQuit').textContent = T('menu.quit');
   $('menu').hidden = false;
 }
 function closeMenu(resume) { $('menu').hidden = true; if (resume) hardPause(false); }
@@ -4837,6 +4923,7 @@ $('mResume').onclick = () => closeMenu(true);
 $('mSave').onclick = () => { save(); sfx('pick'); $('mSave').textContent = T('menu.saved'); };
 $('mSettings').onclick = () => { closeMenu(false); openSheet('settings'); };
 $('mQuit').onclick = () => { closeMenu(false); hardPaused = false; showTitle(); };
+$('mNew').onclick = () => { closeMenu(false); hardPaused = false; showTitle(); showCreation(true); };
 $('menu').addEventListener('click', e => { if (e.target.id === 'menu') closeMenu(true); });
 document.querySelector('.tl').insertAdjacentHTML('afterbegin', `<button class="menub ia" id="bMenu" aria-label="Menu">${svg('menu', 18, 2.2)}</button>`);
 $('bMenu').onclick = () => openMenu();
@@ -4889,12 +4976,12 @@ function pickCar(p) {
 
 addStrings('en', {
   'town.default': 'New Town', 'title.newTown': 'A new town', 'title.namePh': 'Name your town (you can change it later)',
-  'menu.resume': 'Resume', 'menu.save': 'Save', 'menu.saved': 'Saved ✓', 'menu.quit': 'Quit to title screen',
+  'menu.resume': 'Resume', 'menu.save': 'Save', 'menu.saved': 'Saved ✓', 'menu.quit': 'Quit to title screen', 'menu.newTown': 'Start a new town',
   'pov.car': 'Riding along', 'pov.ped': 'Through their eyes', 'pov.chase': 'chase view', 'pov.eye': 'first person', 'pov.stop': 'stop', 'pov.arrived': 'They\u2019ve arrived', 'cit.pov': 'See through their eyes', 'pov.indoors': 'They\u2019re indoors right now',
 });
 addStrings('ja', {
   'town.default': '新しい町', 'title.newTown': '新しい町', 'title.namePh': '町の名前（あとで変更できます）',
-  'menu.resume': 'ゲームに戻る', 'menu.save': '保存', 'menu.saved': '保存しました ✓', 'menu.quit': 'タイトル画面に戻る',
+  'menu.resume': 'ゲームに戻る', 'menu.save': '保存', 'menu.saved': '保存しました ✓', 'menu.quit': 'タイトル画面に戻る', 'menu.newTown': '新しい町を始める',
   'pov.car': '同乗中', 'pov.ped': 'この人の目線', 'pov.chase': '追従視点', 'pov.eye': '一人称', 'pov.stop': '終了', 'pov.arrived': '目的地に着きました', 'cit.pov': 'この人の目線で見る', 'pov.indoors': 'いまは屋内にいます',
 });
 /* =====================================================================
@@ -5055,12 +5142,16 @@ function roadClick(pt) {
 }
 /* ---------- zoning ---------- */
 function lassoArea(p) { let a = 0; for (let i = 0, j = p.length - 2; i < p.length; j = i, i += 2) a += (p[j] + p[i]) * (p[j + 1] - p[i + 1]); return Math.abs(a / 2); }
+/* the outline follows the pointer every frame; plots are previewed only when the pointer rests */
+const lassoPts = [];
+function updateLassoLine() {
+  for (let i = lassoPts.length / 3 * 2; i < lasso.length; i += 2) lassoPts.push(lasso[i], surfY(lasso[i], lasso[i + 1]) + 0.15, lasso[i + 1]);
+  setLinePts(lassoLine, lassoPts); lassoLine.visible = true;
+  lassoLine.material.color.set(tool === 'dezone' ? 0xff6b5e : 0xffffff);
+}
 function updateLassoPreview() {
   prevBuf.reset();
-  const pts = [];
-  for (let i = 0; i < lasso.length; i += 2) pts.push(lasso[i], surfY(lasso[i], lasso[i + 1]) + 0.15, lasso[i + 1]);
-  setLinePts(lassoLine, pts); lassoLine.visible = true;
-  lassoLine.material.color.set(tool === 'dezone' ? 0xff6b5e : 0xffffff);
+  updateLassoLine();
   const src = [];
   if (tool === 'zone' && lasso.length >= 6) {
     lassoLots = genLots(lasso, zoneType, zoneDens);
@@ -5123,6 +5214,7 @@ function processHover() {
     hoverSign = null;
     if (pt && rd.stage === 0) { let bd = 0.3; for (const sp of signSpots) { const d = Math.hypot(sp.x - pt.x, sp.z - pt.z); if (d < bd) { bd = d; hoverSign = sp; } } }
     if (hoverSign) { rd.hov = null; decalOff(); prevBuf.reset(); prevBuf.commit(); showTip(ptr, T('tip.sign.' + ruleOf(hoverSign.nid, hoverSign.sid))); return; }
+    if (roadMode === 'signs') { rd.hov = null; decalOff(); showTip(ptr, T('tip.signsMode')); return; }
     rd.hov = pt ? snapRoad(pt, rd.stage > 0 && roadMode !== 'curve' ? rd.a : rd.stage === 2 ? rd.c : null) : null;
     const conn = isConn(rd.hov);
     if (conn) ring(ringLine, rd.hov.x, rd.hov.z, 0.6, 0x34c759); else decalOff();
@@ -5180,7 +5272,7 @@ cv.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   if (tool === 'zone' || tool === 'dezone') {
     const g = pickClamped(p); if (!g) return;
-    lasso = [g.x, g.z]; lassoT = 0; drag = { mode: 'lasso' }; showTip(null); return;
+    lassoPts.length = 0; lasso = [g.x, g.z]; lassoT = 0; drag = { mode: 'lasso' }; showTip(null); return;
   }
   if (tool === 'terra') {
     brushPt = pickGround(p); if (!brushPt) return;
@@ -5270,7 +5362,8 @@ function handleClick(p) {
       else closeCard();
       break;
     }
-    case 'road': if (!hoverSign && pt && rd.stage === 0) { let bd = 0.3; for (const sp of signSpots) { const d = Math.hypot(sp.x - pt.x, sp.z - pt.z); if (d < bd) { bd = d; hoverSign = sp; } } }
+    case 'road': if (!hoverSign && pt && (rd.stage === 0 || roadMode === 'signs')) { let bd = 0.3; for (const sp of signSpots) { const d = Math.hypot(sp.x - pt.x, sp.z - pt.z); if (d < bd) { bd = d; hoverSign = sp; } } }
+      if (roadMode === 'signs' && !hoverSign) break;
       if (hoverSign) { const nx = { p: 'y', y: 's', s: 'p' }[ruleOf(hoverSign.nid, hoverSign.sid)]; setRule(hoverSign.nid, hoverSign.sid, nx); sfx(nx === 'p' ? 'snap' : 'toggle'); ptr.dirty = true; break; } if (pt) roadClick(pt); break;
     case 'svc': {
       if (!pt) return;
@@ -5295,7 +5388,7 @@ addEventListener('keydown', e => {
   if (k === 'n' && !e.ctrlKey && !e.metaKey) { $('bNews').click(); return; }
   if (k === 'p' && !e.ctrlKey && !e.metaKey) { enterPhoto(); return; }
   if (k === 'f' && !e.ctrlKey && !e.metaKey) { if (document.fullscreenElement) document.exitFullscreen(); else goFullscreen().then(() => { wasFs = true; }).catch(() => flashTip(T('tip.fsBlocked'))); return; }
-  if (k === 'shift') shiftHeld = true;
+  if (k === 'shift' && !e.repeat) { shiftHeld = !shiftHeld; if (tool === 'road' || tool === 'zone' || tool === 'dezone') sfx('toggle'); }
   if (k === ' ') { e.preventDefault(); if (!e.repeat) setSpeed(speed ? 0 : 1); return; }
   const tabKey = { '1': 'roads', '2': 'zones', '3': 'services', '4': 'utilities', '5': 'resources', '6': 'terrain', 'b': 'bulldoze' }[k];
   if (tabKey && !e.ctrlKey && !e.metaKey) { setTab(tab === tabKey ? 'select' : tabKey); return; }
@@ -5306,8 +5399,8 @@ addEventListener('keydown', e => {
   if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd', 'q', 'e', '+', '=', '-'].includes(k)) { keys.add(k); e.preventDefault(); }
 });
 let shiftHeld = false;
-addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'shift') shiftHeld = false; });
-addEventListener('blur', () => { keys.clear(); shiftHeld = false; });
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
 
 /* ---------- picking people on screen ---------- */
 const _pv = new THREE.Vector3();
@@ -5419,6 +5512,8 @@ function load() {
     // earlier saves: names were English strings, petitions needed the player's approval
     for (const p of people) { if (p.fi === undefined) { p.fi = Math.max(0, FIRST.indexOf(p.first)); p.li = Math.max(0, LAST.indexOf(p.last)); } while (p.op.length < 9) p.op.push(0); if (typeof p.act === 'string') p.act = null; }
     if (!Array.isArray(civ.commits)) civ.commits = [];
+    // towns saved before roads had a wider leveled corridor get their road beds regraded once
+    if (!world.regraded) { for (const sg of segs.values()) flattenSeg(sg); world.regraded = true; }
     delete civ.desk; delete civ.goals; delete civ.mandate; delete civ.yearBook;
     if (!world.sandbox) world.sandbox = { money: !!settings.sandbox, unlock: !!settings.unlockAll };
     // a town is only ever named by its player; generated or old default names become the plain default
@@ -5432,7 +5527,12 @@ let firstVisit = false;
 function showTitle() {
   save(); if (photo) exitPhoto(); closeCard(); setTab('select'); if (sheet) closeSheet();
   setSpeed(0); started = false; $('title').hidden = false; titleInfo();
-  $('newCityBox').hidden = true; $('bPlay').hidden = false; $('bNew').hidden = false;
+  showTitleScreen();
+}
+function showTitleScreen() { $('newCityBox').hidden = true; $('bPlay').hidden = false; $('bNew').hidden = false; titleInfo(); }
+function showCreation(canBack) {
+  renderNewCity(); $('newCityBox').hidden = false; $('bPlay').hidden = true; $('bNew').hidden = true;
+  $('bBack').hidden = !canBack; document.querySelector('#title h1').textContent = T('title.newTown'); $('titleSub').textContent = T('title.choose');
 }
 function newCity(fresh, opts = {}) {
   clearAgents(); resetDrafts(); closeCard();
@@ -5448,7 +5548,7 @@ function newCity(fresh, opts = {}) {
     lots.clear(); for (const c of lotGrid) c.clear();
     svcs.clear(); rules = new Map();
     nextNode = nextSeg = nextLot = nextSvc = 1;
-    world.sandbox = { money: !!opts.money, unlock: !!opts.unlock };
+    world.sandbox = { money: !!opts.money, unlock: !!opts.unlock }; world.regraded = true;
     world.town = opts.name ? { t: 'tw', c: opts.name } : { t: 'q', v: 'town.default' };
     money = DIFF.normal.money; day = 0; tickN = 0; calAcc = 0; growBudget = 1; lastNet = 0; budget = null; cityName = rs(world.town); msReached = 0; popPrev = 0; popDelta = 0;
     people = []; nextPid = 1; civ = freshCiv();
@@ -5503,7 +5603,7 @@ const sunDir = new THREE.Vector3();
 const NIGHT_SKY = new THREE.Color(0x101a2c), DAY_SKY = new THREE.Color(0xbcd9ec), DUSK_SKY = new THREE.Color(0xf0a77a);
 const WIN_DAY = new THREE.Color(0x33414f), WIN_NIGHT = new THREE.Color(0xffd38a), LAMP_DAY = new THREE.Color(0xd9dde2), LAMP_NIGHT = new THREE.Color(0xfff1c8);
 function dayNight(dt) {
-  if (speed) tod = (tod + dt * SPEEDS[speed] / 480) % 1;
+  if (!settings.dayNight) tod = 0.36; else if (speed) tod = (tod + dt * SPEEDS[speed] / 480) % 1;
   // tod: 0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset
   const a = (tod - 0.25) * Math.PI * 2, el = Math.sin(a);
   const day01 = smooth01(clamp(el * 2.2 + 0.25, 0, 1));
@@ -5529,7 +5629,7 @@ function dayNight(dt) {
 /* render loop: 30 / 60 / match the display / unlimited */
 const mc = new MessageChannel();
 mc.port1.onmessage = () => frameLoop(performance.now());
-function schedule() { if (document.hidden) { setTimeout(() => frameLoop(performance.now()), 500); return; } if (String(settings.fpsMode) === 'unlimited') mc.port2.postMessage(0); else requestAnimationFrame(frameLoop); }
+function schedule() { if (document.hidden) { setTimeout(() => frameLoop(performance.now()), 500); return; } if (false) mc.port2.postMessage(0); else requestAnimationFrame(frameLoop); }
 let started = false, photo = false, photoSpeed = 1, barPeek = 0, barT = 2, barB = 2, barR = 2, gx = 0, gy = 0, nightWatch = 0;
 addEventListener('pointermove', e => { const r = frame.getBoundingClientRect(); gx = e.clientX - r.left; gy = e.clientY - r.top; if (e.pointerType === 'touch') barPeek = Math.max(barPeek, 0.5); }, { passive: true });
 function updateBars(dt) {
@@ -5578,8 +5678,8 @@ function frameLoop(now) {
   // tools
   if (drag && drag.mode === 'terra') { const pt = pickGround(drag.p); if (pt) brushPt = pt; applyBrush(dt); if (brushPt) ring(ringLine, brushPt.x, brushPt.z, [1.4, 2.6, 4.2][brushSize], 0xffffff); }
   if (lasso && lasso.length >= 2) ring(ringLine, lasso[lasso.length - 2], lasso[lasso.length - 1], 0.42, tool === 'zone' && ZONES[zoneType] ? ZONES[zoneType].color : 0xff6b5e);
-  if (lasso && lassoT < 0) { lassoT = now; }
-  if (lasso && lassoT > 0 && now - lassoT > 45) { lassoT = 0; updateLassoPreview(); }
+  if (lasso && lassoT < 0) { lassoT = now; updateLassoLine(); }
+  if (lasso && lassoT > 0 && now - lassoT > 170) { lassoT = 0; updateLassoPreview(); }
   if (ptr.dirty && tool !== 'select') processHover(); else if (ptr.dirty) { ptr.dirty = false; showTip(null); }
   // cursor decal: follows the pointer on the same frame, fades in and out softly
   decal.on += ((decal.want && ptr.in ? 1 : 0) - decal.on) * Math.min(1, rdt * 16);
@@ -5607,6 +5707,7 @@ function frameLoop(now) {
   // contours: always in the terrain tool; held Shift shows them while drawing roads or zoning
   const topoWant = overlay === 'topo' ? 1 : shiftHeld && (tool === 'road' || tool === 'zone' || tool === 'dezone') ? 1 : 0;
   topoU.value = overlay === 'topo' ? 1 : topoU.value + (topoWant - topoU.value) * Math.min(1, rdt * 10);
+  topoN.value = nightF;
   const cn = $('compassN'); if (cn) cn.style.transform = `rotate(${cur.yaw}rad)`;
   ambience(dt); musicTick(dt);
   drawDynamic(now / 1000, dt);
@@ -5640,22 +5741,25 @@ $('bPlay').addEventListener('click', () => {
   startPlaying();
 });
 let ncBiome = 'valley';
+if (String(settings.fpsMode) === 'unlimited') settings.fpsMode = 'display';
 function renderNewCity() {
   const box = $('newCityBox');
-  box.innerHTML = `<div class="bgrid">${Object.keys(BIOMES).map(k => `<button class="bopt${k === ncBiome ? ' on' : ''}" data-biome="${k}"><b>${T('biome.' + k)}</b><small>${T('biomed.' + k)}</small></button>`).join('')}</div>
+  ncBiome = 'valley';
+  box.innerHTML = `
     <label class="nclab">${T('title.name')}<input id="nameIn" value="" placeholder="${T('title.namePh')}" spellcheck="false"></label>
     <label class="nclab">${T('title.seed')}<input id="seedIn" value="${ncBiome}-${(Math.random() * 99999) | 0}" spellcheck="false"></label>
     <div class="ncsw"><label><input type="checkbox" id="sbMoney"> ${T('title.money')}</label><label><input type="checkbox" id="sbUnlock"> ${T('title.unlock')}</label></div>
-    <div style="display:flex;gap:8px;margin-top:10px"><button class="play" style="flex:1;font-size:16px;padding:12px" id="bStartNew">${T('title.start')}</button></div>`;
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="play" style="flex:1;font-size:16px;padding:12px" id="bStartNew">${T('title.start')}</button></div><div class="tlinks"><button id="bBack">${T('title.back')}</button></div>`;
 }
 $('newCityBox').addEventListener('input', e => { if (e.target.id === 'nameIn' && $('bPlay').hidden) document.querySelector('#title h1').textContent = e.target.value.trim() || T('title.newTown'); });
-$('bNew').addEventListener('click', () => { const b = $('newCityBox'); b.hidden = !b.hidden; if (!b.hidden) renderNewCity(); });
+$('bNew').addEventListener('click', () => showCreation(true));
 $('newCityBox').addEventListener('click', e => {
+  if (e.target.id === 'bBack') { showTitleScreen(); return; }
   const o = e.target.closest('[data-biome]');
   if (o) { ncBiome = o.dataset.biome; const v = $('seedIn').value.replace(/^[a-z]+/i, ncBiome); renderNewCity(); $('seedIn').value = v; return; }
   if (e.target.id === 'bStartNew') {
     const p = parseSeed($('seedIn').value) || { biome: ncBiome, seed: (Math.random() * 99999) | 0 };
-    p.name = $('nameIn').value.trim(); p.money = $('sbMoney').checked; p.unlock = $('sbUnlock').checked;
+    p.biome = 'valley'; p.name = $('nameIn').value.trim(); p.money = $('sbMoney').checked; p.unlock = $('sbUnlock').checked;
     newCity(true, p); applyCam(1); $('newCityBox').hidden = true;
     goFullscreen().then(() => { wasFs = true; }).catch(() => {});
     $('bPlay').hidden = false; $('bNew').hidden = false; firstVisit = false;
@@ -5667,7 +5771,7 @@ function onFsChange() {
   const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
   if (fs) { wasFs = true; resize(); return; }
   resize();
-  if (wasFs && started) { wasFs = false; if (photo) exitPhoto(); if (pov) stopPOV(); hardPause(true); $('resume').hidden = false; }
+  wasFs = false;
 }
 document.addEventListener('fullscreenchange', onFsChange);
 document.addEventListener('webkitfullscreenchange', onFsChange);
@@ -5721,7 +5825,7 @@ waterMat.uniforms.uAnim.value = settings.water === 'animated' ? 1 : 0;
 newCity(false);
 applyCam(1);
 setSpeed(0); applyLang(); titleInfo();
-if (firstVisit) { renderNewCity(); $('newCityBox').hidden = false; $('bPlay').hidden = true; $('bNew').hidden = true; const t1 = document.querySelector('#title h1'); t1.textContent = T('title.newTown'); $('titleSub').textContent = T('title.choose'); } document.body.classList.toggle('calm', !!settings.reduceMotion);
+if (firstVisit) showCreation(false); document.body.classList.toggle('calm', !!settings.reduceMotion);
 addEventListener('pagehide', () => { if (started) save(); });
 requestAnimationFrame(frameLoop);
 })();
