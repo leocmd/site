@@ -3223,11 +3223,7 @@ function drawJunctionSigns() {
     const r = ruleOf(s.nid, s.sid), hov = hoverSign === s, k = hov ? 1.25 : 1;
     const pc = r === 'p' ? (hov ? 0xd1d5db : 0xa3a8ae) : r === 'y' ? 0xff9f0a : 0xff453a;
     put(MJ.puck, s.x, s.y, s.z, 0.2 * k, 0.018, 0.2 * k, 0, pc);
-    if (r !== 'p') {
-      put(MJ.pole, s.sx, s.y, s.sz, 0.018, 0.3, 0.018, s.ang, 0x8d949b);
-      if (r === 'y') { put(MJ.tri, s.sx, s.y + 0.36, s.sz, 0.24 * k, 0.012, 0.24 * k, s.ang, 0xd9483b, Math.PI / 2); put(MJ.tri, s.sx, s.y + 0.36, s.sz + 0, 0.15 * k, 0.016, 0.15 * k, s.ang, 0xffffff, Math.PI / 2); }
-      else { put(MJ.oct, s.sx, s.y + 0.36, s.sz, 0.22 * k, 0.012, 0.22 * k, s.ang, 0xd9483b, Math.PI / 2); put(MJ.pole, s.sx, s.y + 0.35, s.sz, 0.12 * k, 0.025, 0.016, s.ang, 0xffffff); }
-    }
+    // the world's own sign shows the state; the editor only adds the clickable marker
   }
   finish(MJ.puck, MJ.tri, MJ.oct, MJ.pole);
 }
@@ -3568,12 +3564,14 @@ function toolFor(t) {
   if (t === 'zones') return zoneType === 'X' ? 'dezone' : 'zone';
   if (t === 'terrain') return 'terra';
   if (t === 'bulldoze') return 'doze';
-  return 'svc';
+  return svcType ? 'svc' : 'select';
 }
 let prevOverlay = 0, autoView = false;
 function setTab(t) {
+  // opening a building tab arms nothing: a building follows the cursor only after you pick its card
+  if (t !== tab && SVC_TABS[t]) svcType = null;
   tab = t;
-  if (SVC_TABS[t] && !SVC_TABS[t].includes(svcType)) svcType = SVC_TABS[t][0];
+  if (SVC_TABS[t] && svcType && (!SVC_TABS[t].includes(svcType) || !unlocked(svcType))) svcType = null;
   tool = toolFor(t);
   resetDrafts();
   const want = tab === 'terrain' ? 'topo' : tool === 'svc' ? (SVC[svcType].field ? SVC[svcType].field : SVC[svcType].res ? 'resources' : SVC[svcType].power ? 'power' : SVC[svcType].water ? (svcType === 'well' ? 'resources' : 'water') : 0) : 0;
